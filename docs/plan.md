@@ -2,9 +2,10 @@
 
 ## Estado actual y siguiente paso
 
-- **Etapa actual:** Etapa 2 (documentación mínima) entregada y pendiente de revisión.
-- **Siguiente paso:** el autor revisa la documentación y ejecuta `git init` dentro de `pendla/` (decisión D0). Después, planificar y aprobar la Fase 0.
+- **Fase actual:** Fase 0 terminada (2026-11-09). La aplicación arranca contra PostgreSQL, `/api/ping` responde `pong` y Swagger lo muestra.
+- **Siguiente paso:** planificar y aprobar el diseño de la Fase 1 (candidaturas: crear, listar, borrar).
 - **Bloqueos:** ninguno.
+- **A tener en cuenta:** en Fase 1 aparecerá el aviso de Mockito "self-attaching" con Java 25. Es inofensivo, pero hay que decidir si se configura Mockito como agente en el `pom.xml`.
 
 ## Requisitos del MVP
 
@@ -31,17 +32,17 @@
 ### Etapas previas
 
 - [x] Etapa 1: análisis y propuesta aprobados
-- [ ] Etapa 2: documentación mínima revisada por el autor
+- [x] Etapa 2: documentación mínima revisada por el autor
 
 ### Fase 0 — Esqueleto que responde
 
 **Objetivo:** el proyecto existe, arranca y responde a una petición simple.
 
-- [ ] Generar el proyecto en start.spring.io: Maven, Java 25, paquete `io.github.anevadog.pendla`
-- [ ] Conectar con PostgreSQL local (base de datos `pendla`) leyendo la configuración del entorno
-- [ ] Endpoint `GET /api/ping` → `"pong"`, con su test en MockMvc
-- [ ] Swagger UI visible
-- [ ] Comprobar a mano que JobTech responde (una petición GET de ejemplo) y anotar los campos reales
+- [x] Generar el proyecto en start.spring.io: Maven, Spring Boot 4.1.2, Java 25, paquete `io.github.anevadog.pendla`
+- [x] Conectar con PostgreSQL local (base de datos `pendla`) leyendo la configuración del entorno
+- [x] Endpoint `GET /api/ping` → `"pong"`, con su test en MockMvc
+- [x] Swagger UI visible
+- [x] Comprobar a mano que JobTech responde (una petición GET de ejemplo) y anotar los campos reales (ver Fase 3)
 
 **Terminado cuando:** `./mvnw test` pasa, la aplicación arranca contra PostgreSQL y Swagger muestra `/api/ping`.
 
@@ -79,6 +80,23 @@
 ### Fase 3 — Búsqueda en JobTech
 
 **Objetivo:** RF-01, RF-02 y RF-03.
+
+**Datos reales de JobTech (comprobado el 2026-11-09 con `GET /search?q=java&limit=1`):**
+
+- Responde 200 en ~1 s y no necesita clave.
+- Raíz de la respuesta: `total.value` (número de resultados) y `hits` (lista de ofertas).
+- Campos que usaremos de cada oferta:
+
+  | Campo de JobTech | Campo nuestro | Ejemplo |
+  |---|---|---|
+  | `id` | `jobtechId` | `31696992` |
+  | `headline` | `title` | `Integrationsutvecklare Java` |
+  | `employer.name` | `employer` | `Deploja AB` |
+  | `workplace_address.municipality` | `city` | `Stockholm` |
+  | `webpage_url` | `url` | `https://arbetsformedlingen.se/platsbanken/annonser/31696992` |
+
+- Para filtrar por ciudad se usa `workplace_address.municipality_concept_id` (Stockholm: `AvNB_uwa_6n6`) como parámetro `municipality`. Los códigos del resto de ciudades se verifican en esta fase.
+- `application_details` (que puede llevar un `email`) y `application_contacts` contienen datos de contacto. **No se mapean.**
 
 - [ ] Verificar los códigos de municipio reales de las ciudades admitidas
 - [ ] Cliente con `RestClient` y timeouts (connect ~3 s, read ~5 s)

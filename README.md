@@ -32,18 +32,26 @@ Technical decisions and their alternatives: see [docs/decisiones.md](docs/decisi
 
 ## How to run
 
-Prerequisites: Java 25 and a local PostgreSQL database.
+Prerequisites: Java 25 and PostgreSQL running locally.
 
-1. Copy `.env.example` to `.env` and fill in your local database values.
-2. Start the application:
+1. Create the database user and the database (as the `postgres` superuser):
+
+   ```sql
+   CREATE USER pendla WITH PASSWORD 'your-password';
+   CREATE DATABASE pendla OWNER pendla;
+   ```
+
+2. Copy `.env.example` to `.env` and set the same password. The app reads `.env` on startup.
+3. Start the application (on Windows PowerShell use `.\mvnw.cmd` instead of `./mvnw`):
 
    ```bash
    ./mvnw spring-boot:run
    ```
 
-3. Open Swagger UI at `http://localhost:8080/swagger-ui.html`.
+4. Check it is up: `http://localhost:8080/api/ping` returns `pong`.
+5. Open Swagger UI at `http://localhost:8080/swagger-ui.html`.
 
-Run the tests:
+Run the tests (no database needed):
 
 ```bash
 ./mvnw test
@@ -53,6 +61,7 @@ Run the tests:
 
 | Method | Path | Description | Status |
 |---|---|---|---|
+| GET | `/api/ping` | Health check, returns `pong` | Done |
 | GET | `/api/jobs?keyword=java&city=Göteborg` | Search job ads in JobTech | Planned |
 | POST | `/api/applications` | Save a job application | Planned |
 | GET | `/api/applications` | List applications (newest first) | Planned |

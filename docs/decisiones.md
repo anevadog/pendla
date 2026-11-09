@@ -52,6 +52,31 @@ Mi chuleta para la defensa: qué elegí, qué descarté y por qué.
 - **Descartado:** Flyway desde el inicio.
 - **Motivo:** el MVP funciona sin migraciones versionadas. Sé que `update` no es adecuado en producción porque no versiona los cambios ni borra columnas. Flyway queda en "Ideas para después".
 
+## Fase 0 — Esqueleto
+
+### F0-1. Variables de entorno cargadas desde `.env`
+
+- **Elegido:** `spring.config.import=optional:file:.env[.properties]` en `application.properties`. La conexión usa `${DB_URL}`, `${DB_USERNAME}` y `${DB_PASSWORD}`.
+- **Descartado:** definir las variables a mano en el IDE y en la terminal.
+- **Motivo:** Spring Boot no lee `.env` por sí solo. Con una línea funciona igual desde la terminal y desde el IDE. El sufijo `[.properties]` le dice a Spring que lea el archivo como `clave=valor`, y `optional:` evita que falle la importación si el archivo no existe. Aun así, sin `.env` la aplicación no arranca porque no puede resolver `${DB_URL}`, y eso es lo que queremos: fallar pronto y con un error claro.
+
+### F0-2. Sin test `contextLoads`
+
+- **Elegido:** borrar el test `@SpringBootTest` que genera Initializr.
+- **Descartado:** mantenerlo.
+- **Motivo:** ese test arranca la aplicación entera y necesita PostgreSQL encendido. Los tests no deben depender de la base de datos local. Que la aplicación arranca se comprueba a mano al cerrar cada fase.
+
+### F0-3. Ping propio en lugar de Actuator
+
+- **Elegido:** un `PingController` con `GET /api/ping`, probado con `@WebMvcTest`.
+- **Descartado:** Spring Boot Actuator (`/actuator/health`).
+- **Motivo:** es lo más sencillo para aprender `@RestController` y su test. Actuator añade una dependencia y no deja código propio que probar.
+
+### F0-4. springdoc-openapi 3.2.0
+
+- **Elegido:** springdoc 3.2.0, con la versión fijada en una propiedad del `pom.xml`.
+- **Motivo:** la rama 3.x es la de Spring Boot 4. Comprobé en Maven Central que la 3.2.0 está construida sobre Spring Boot 4.1.2, la misma versión del proyecto. springdoc no forma parte de Spring, así que el parent de Spring Boot no gestiona su versión y hay que indicarla a mano.
+
 ### Stack
 
 | Decisión | Elegido | Descartado | Motivo |
