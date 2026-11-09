@@ -1,0 +1,64 @@
+# Decisiones técnicas — Pendla
+
+Mi chuleta para la defensa: qué elegí, qué descarté y por qué.
+
+## Etapa 1 — Análisis y propuesta
+
+### D0. Repositorio Git propio dentro de `pendla/`
+
+- **Elegido:** un repositorio independiente creado con `git init` dentro de la carpeta del proyecto.
+- **Descartado:** usar el repositorio que ya existía en mi carpeta de usuario.
+- **Motivo:** ese repositorio veía archivos personales y de configuración del sistema, y mezclaba proyectos distintos. Un repositorio por proyecto evita subir algo por error y deja un historial limpio.
+
+### D1. PostgreSQL desde el inicio
+
+- **Elegido:** PostgreSQL local, que ya tengo instalado (versión 18).
+- **Descartado:** H2 en el MVP y migrar a PostgreSQL más adelante.
+- **Motivo:** es la base de datos que se usa en empresas y no obliga a migrar después. H2 no se comporta exactamente igual que PostgreSQL. Como ya está instalado, el coste de configurarlo es bajo. Los tests de servicio y de controlador no necesitan base de datos.
+
+### D2. Ciudad mediante un mapa fijo de códigos de municipio
+
+- **Elegido:** un mapa con unas pocas ciudades (por ejemplo Stockholm, Göteborg, Malmö, Uppsala) traducidas a su código de municipio de JobTech. Una ciudad que no está en el mapa devuelve 400.
+- **Descartado:** añadir la ciudad al texto libre de la búsqueda (`q="java Göteborg"`).
+- **Motivo:** el filtro por municipio es exacto. El texto libre también devuelve ofertas que solo mencionan la ciudad. La limitación es aceptable en el MVP y ampliar la lista queda en "Ideas para después".
+
+### D3. Los datos de la candidatura los envía el cliente
+
+- **Elegido:** el `POST` recibe el título, la empresa, la ciudad, la url y el `jobtechId` (opcional). Un `jobtechId` repetido devuelve 409.
+- **Descartado:** recibir solo el `jobtechId` y pedir los datos a JobTech desde el servidor.
+- **Motivo:** evita una segunda llamada externa (y su posible fallo) y permite guardar candidaturas que no vienen de JobTech.
+
+### D4. Transiciones de estado con reglas
+
+- **Elegido:** transiciones permitidas en el enum: `SAVED→SENT`, `SENT→INTERVIEW/REJECTED`, `INTERVIEW→OFFER/REJECTED`. `REJECTED` y `OFFER` son finales. Una transición inválida devuelve 409.
+- **Descartado:** permitir cambiar a cualquier estado.
+- **Motivo:** refleja el proceso real, pone lógica de negocio en el dominio y se prueba bien. Uso 409 y no 400 porque la petición está bien formada, pero choca con el estado actual del recurso.
+
+### D5. Errores con `ProblemDetail`
+
+- **Elegido:** `ProblemDetail` de Spring, que sigue el estándar RFC 9457.
+- **Descartado:** un `record ErrorResponse` propio.
+- **Motivo:** es un estándar, viene incluido en Spring y no hay que mantener otra clase.
+
+### D6. Idioma
+
+- **Elegido:** código, endpoints y README en inglés. Documentación interna en español.
+- **Descartado:** todo en español.
+- **Motivo:** el README lo leerán reclutadores en Suecia. Las decisiones y el plan son para mí.
+
+### D7. Esquema con `ddl-auto=update` en el MVP
+
+- **Elegido:** Hibernate crea y actualiza las tablas (`spring.jpa.hibernate.ddl-auto=update`).
+- **Descartado:** Flyway desde el inicio.
+- **Motivo:** el MVP funciona sin migraciones versionadas. Sé que `update` no es adecuado en producción porque no versiona los cambios ni borra columnas. Flyway queda en "Ideas para después".
+
+### Stack
+
+| Decisión | Elegido | Descartado | Motivo |
+|---|---|---|---|
+| Versión de Java | Java 25 (LTS) | Java 21 (LTS) | Al empezar comprobé que ya tenía instalado Java 25, que también es LTS. Instalar Java 21 no aporta nada al MVP |
+| Build | Maven | Gradle | Es más habitual en ofertas junior y su configuración es declarativa (`pom.xml`) |
+| Cliente HTTP | `RestClient` | WebClient, Feign | Viene incluido en Spring y es síncrono y sencillo. WebClient es reactivo (no hace falta) y Feign añade una dependencia para una sola llamada |
+| DTOs | `record` de Java | Clases con Lombok | Son inmutables y no necesitan librerías. Lombok oculta código que tengo que saber explicar |
+| Simular JobTech en tests | `MockRestServiceServer` | WireMock | Viene incluido en Spring Test y basta para el MVP |
+| Organización del código | Por funcionalidad (`application/`, `jobsearch/`, `common/`) | Por capas (`controller/`, `service/`…) | Todo lo de una funcionalidad está junto y las capas se ven en el nombre de cada clase. Por capas, cada funcionalidad se reparte en cinco carpetas |
