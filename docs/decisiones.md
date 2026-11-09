@@ -193,6 +193,38 @@ Mi chuleta para la defensa: qué elegí, qué descarté y por qué.
 - **Descartado:** un objeto con `total` y la lista.
 - **Motivo:** es lo mínimo que cumple el requisito. Mostrar el total queda en "Ideas para después".
 
+## Fase 4 — Cierre para el portafolio
+
+### F4-1. Códigos de error en la descripción de Swagger
+
+- **Elegido:** cada `@Operation` lleva un `summary` y una `description` de una línea con sus códigos de error (por ejemplo "400 invalid keyword or city · 502 JobTech error · 504 JobTech timeout").
+- **Descartado:** un `@ApiResponse` por cada código de cada endpoint (unas 15 anotaciones).
+- **Motivo:** se lee igual en Swagger con muy poco código. Con `@ApiResponse` los controladores tendrían más líneas de documentación que de código, y el README ya tiene la tabla de errores.
+
+### F4-2. Ejemplos reales en Swagger
+
+- **Elegido:** `@Schema(example = ...)` en los DTOs de entrada y `@Parameter(example = ...)` en la búsqueda, con los datos de una oferta real de JobTech. La información general va en `@OpenAPIDefinition`, en `OpenApiConfig`.
+- **Descartado:** los valores genéricos que genera springdoc (`"string"`).
+- **Motivo:** "Try it out" funciona sin escribir nada y sirve para hacer una demo. Límite: la versión `0.0.1` está escrita a mano y no se lee del `pom.xml`.
+
+### F4-3. README con ejemplos `curl` y límites conocidos
+
+- **Elegido:** un flujo típico en cuatro pasos con `curl` y su respuesta, la estructura de paquetes, qué prueba cada tipo de test (sin dar el número de tests) y una sección de límites conocidos.
+- **Descartado:** peticiones HTTP en crudo y una captura de Swagger.
+- **Motivo:** `curl` se puede copiar y pegar. Una captura se queda desactualizada y añade un archivo binario. Contar los límites demuestra criterio. Los JSON de ejemplo se comprobaron contra las respuestas reales: Spring 7 ya no incluye `"type": "about:blank"`.
+
+### F4-4. `AGENTS.md` y `CLAUDE.md` fuera del repositorio
+
+- **Elegido:** `git rm --cached` y excluirlos en `.git/info/exclude`. Siguen en mi disco como instrucciones para la IA, pero no se publican.
+- **Descartado:** mantenerlos en el repositorio público, o reescribir el historial para borrarlos de los commits antiguos.
+- **Motivo:** no hacen falta para compilar, ejecutar ni entender el proyecto. Reescribir el historial exige `git push --force` y cambia los 17 commits; para un portafolio no compensa.
+
+### F4-5. Archivos locales con `.git/info/exclude`
+
+- **Elegido:** la chuleta de defensa y las instrucciones de la IA se ignoran en `.git/info/exclude`.
+- **Descartado:** añadirlos a `.gitignore`.
+- **Motivo:** `.gitignore` se sube, y en GitHub se verían los nombres de esos archivos. `.git/info/exclude` funciona igual pero solo existe en mi equipo.
+
 ### Stack
 
 | Decisión | Elegido | Descartado | Motivo |

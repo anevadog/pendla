@@ -2,8 +2,8 @@
 
 ## Estado actual y siguiente paso
 
-- **Fase actual:** Fase 3 terminada (2026-11-09). Todo el MVP funciona: candidaturas con cambio de estado contra PostgreSQL y búsqueda real en JobTech con errores 400/502/504 (probado en Swagger); 67 tests en verde.
-- **Siguiente paso:** planificar y aprobar la Fase 4 (cierre para el portafolio): README completo con ejemplos, descripciones de Swagger, repaso de decisiones y ensayo de defensa.
+- **Fase actual:** Fase 4 en curso. README y Swagger terminados; `AGENTS.md` y `CLAUDE.md` ya no se publican. 67 tests en verde.
+- **Siguiente paso (autor):** reescribir `docs/decisiones.md` con mis palabras (D2 y F1-8 están desactualizadas: ver la entrega 3) y terminar el ensayo de defensa con la chuleta local (`chuleta-defensa.md`, 3 rondas). Después, la IA corrige las respuestas que quiera y comprueba que `decisiones.md` sigue coincidiendo con el código.
 - **Bloqueos:** ninguno.
 
 ## Requisitos del MVP
@@ -123,8 +123,8 @@
 
 **Objetivo:** proyecto presentable y defendible.
 
-- [ ] README completo, con ejemplos de petición y respuesta
-- [ ] Revisar las descripciones de Swagger
+- [x] README completo, con ejemplos de petición y respuesta
+- [x] Revisar las descripciones de Swagger
 - [ ] Repasar `docs/decisiones.md` con mis palabras
 - [ ] Ensayo de defensa: explicar cada clase sin mirar el código
 
@@ -153,3 +153,5 @@
 - Bloqueo optimista con `@Version` para dos cambios de estado simultáneos sobre la misma candidatura
 - Historial de cambios de estado con fecha
 - Devolver el total de resultados de JobTech junto a la lista ("105 resultados, se muestran 20")
+- GitHub Actions que ejecute `./mvnw test` en cada push (gratis en repositorios públicos; badge verde en el README)
+- Leer la versión de la API en Swagger desde el `pom.xml` en lugar de escribirla a mano
