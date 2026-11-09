@@ -155,6 +155,44 @@ Mi chuleta para la defensa: qué elegí, qué descarté y por qué.
 - **Motivo:** solo cambia un campo. `PUT` significa reemplazar el recurso entero y obligaría a reenviar todos los datos. La subruta deja claro que solo se toca el estado.
 - **Límite conocido:** un valor que no existe en el enum (`"FOO"`) devuelve 400 con el mensaje genérico de Spring, sin decir qué valores son válidos. Mejorarlo queda en "Ideas para después".
 
+## Fase 3 — Búsqueda en JobTech
+
+### F3-1. El cliente traduce los errores de JobTech
+
+- **Elegido:** `JobTechClient` captura `RestClientException` y lanza `JobTechTimeoutException` (504) si la causa es un `SocketTimeoutException`, o `JobTechUnavailableException` (502) en cualquier otro caso: 4xx, 5xx, cuerpo ilegible o vacío, o sin conexión.
+- **Descartado:** dejar que las excepciones de Spring lleguen al `@ControllerAdvice` y traducirlas allí.
+- **Motivo:** la integración queda aislada en una sola clase y el resto de la aplicación no sabe que existe `RestClient`. El try/catch está en el cliente, no en un controlador. El timeout de conexión (3 s) también lanza un `SocketTimeoutException`, así que da 504: JobTech no respondió a tiempo.
+
+### F3-2. `RestClient` creado a mano con `SimpleClientHttpRequestFactory`
+
+- **Elegido:** un bean en `JobTechClientConfig` con `RestClient.builder()`, con la URL base y los timeouts leídos de `application.properties` mediante `@Value`.
+- **Descartado:** el `RestClient.Builder` autoconfigurado por Spring Boot, con propiedades `spring.http.client.*`.
+- **Motivo:** no añade dependencias (todo está en `spring-web`) y los timeouts se ven en el código. En Spring Boot 4 los clientes HTTP se reorganizaron en módulos, y la autoconfiguración podría necesitar otro starter. La URL y los timeouts no son secretos, así que van en `application.properties` y no en `.env`.
+
+### F3-3. DTOs de JobTech con solo los campos que usamos
+
+- **Elegido:** records anidados en `JobTechSearchResponse` con `@JsonIgnoreProperties(ignoreUnknown = true)`, y `@JsonProperty` para los nombres en snake_case.
+- **Descartado:** leer la respuesta como un `Map` o un `JsonNode`.
+- **Motivo:** el tipado detecta los errores al compilar y deja claro qué se lee. Los campos de contacto (`application_details`, `application_contacts`) no aparecen en el record, así que no se pueden leer por error. Un test lo comprueba con un `email` en el JSON.
+
+### F3-4. Ciudad opcional, con nombres suecos y sin distinguir mayúsculas
+
+- **Elegido:** `city` es opcional; sin ella se busca en toda Suecia. Se aceptan `Stockholm`, `Göteborg`, `Malmö` y `Uppsala` sin distinguir mayúsculas. El error 400 lista las ciudades válidas.
+- **Descartado:** que `city` sea obligatoria, o aceptar variantes como `Goteborg` o `Gothenburg`.
+- **Motivo:** RF-02 solo exige `keyword`, y buscar sin ciudad cuesta lo mismo. Cada variante de nombre sería una regla más que explicar. La ciudad se valida antes de llamar a JobTech porque JobTech responde 200 aunque el `municipality` no exista.
+
+### F3-5. Errores de `@RequestParam` con `errors` por parámetro
+
+- **Elegido:** sobrescribir `handleHandlerMethodValidationException` para que un `keyword` vacío o demasiado largo devuelva 400 con `errors.keyword`, igual que el `POST` de candidaturas.
+- **Descartado:** el 400 genérico de Spring ("Validation failure").
+- **Motivo:** son unas 10 líneas y el cliente sabe qué parámetro falló. Límite conocido: si falta el parámetro, Spring responde "Required parameter 'keyword' is not present" sin `errors`. Las dos respuestas son `ProblemDetail`.
+
+### F3-6. Se devuelve solo la lista de ofertas
+
+- **Elegido:** `List<JobAdResponse>`, como pide RF-01.
+- **Descartado:** un objeto con `total` y la lista.
+- **Motivo:** es lo mínimo que cumple el requisito. Mostrar el total queda en "Ideas para después".
+
 ### Stack
 
 | Decisión | Elegido | Descartado | Motivo |

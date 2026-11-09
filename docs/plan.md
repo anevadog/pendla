@@ -2,8 +2,8 @@
 
 ## Estado actual y siguiente paso
 
-- **Fase actual:** Fase 2 terminada (2026-11-09). El CRUD de candidaturas y el cambio de estado con reglas de transición funcionan contra PostgreSQL (probado en Swagger); 49 tests en verde.
-- **Siguiente paso:** planificar y aprobar el diseño de la Fase 3 (búsqueda en JobTech). Lo primero es verificar los códigos de municipio reales de las ciudades admitidas (D2).
+- **Fase actual:** Fase 3 terminada (2026-11-09). Todo el MVP funciona: candidaturas con cambio de estado contra PostgreSQL y búsqueda real en JobTech con errores 400/502/504 (probado en Swagger); 67 tests en verde.
+- **Siguiente paso:** planificar y aprobar la Fase 4 (cierre para el portafolio): README completo con ejemplos, descripciones de Swagger, repaso de decisiones y ensayo de defensa.
 - **Bloqueos:** ninguno.
 
 ## Requisitos del MVP
@@ -94,20 +94,30 @@
   | `workplace_address.municipality` | `city` | `Stockholm` |
   | `webpage_url` | `url` | `https://arbetsformedlingen.se/platsbanken/annonser/31696992` |
 
-- Para filtrar por ciudad se usa `workplace_address.municipality_concept_id` (Stockholm: `AvNB_uwa_6n6`) como parámetro `municipality`. Los códigos del resto de ciudades se verifican en esta fase.
+- Para filtrar por ciudad se usa `workplace_address.municipality_concept_id` como parámetro `municipality`. Códigos verificados el 2026-11-09:
+
+  | Ciudad | `municipality` | Código |
+  |---|---|---|
+  | Stockholm | `AvNB_uwa_6n6` | 0180 |
+  | Göteborg | `PVZL_BQT_XtL` | 1480 |
+  | Malmö | `oYPt_yRA_Smm` | 1280 |
+  | Uppsala | `otaF_bQY_4ZD` | 0380 |
+
+- Algunas ofertas tienen varios lugares de trabajo: al filtrar por Göteborg aparecen ofertas cuya dirección principal es otra ciudad (por ejemplo Alingsås). Se acepta como límite conocido.
+- Un `municipality` inventado no da error: JobTech responde 200 igualmente. Por eso validamos la ciudad antes de llamar.
 - `application_details` (que puede llevar un `email`) y `application_contacts` contienen datos de contacto. **No se mapean.**
 
-- [ ] Verificar los códigos de municipio reales de las ciudades admitidas
-- [ ] Cliente con `RestClient` y timeouts (connect ~3 s, read ~5 s)
-- [ ] DTOs de la respuesta de JobTech, ignorando los campos desconocidos
-- [ ] Mapeo a la oferta simplificada, sin datos de contacto
-- [ ] `GET /api/jobs` con validación
-- [ ] Errores 502 y 504 en el `@ControllerAdvice`
-- [ ] Tests con `MockRestServiceServer`: éxito, error 500, respuesta ilegible y timeout
+- [x] Verificar los códigos de municipio reales de las ciudades admitidas
+- [x] Cliente con `RestClient` y timeouts (connect ~3 s, read ~5 s)
+- [x] DTOs de la respuesta de JobTech, ignorando los campos desconocidos
+- [x] Mapeo a la oferta simplificada, sin datos de contacto
+- [x] `GET /api/jobs` con validación
+- [x] Errores 502 y 504 en el `@ControllerAdvice`
+- [x] Tests con `MockRestServiceServer`: éxito, error 500, respuesta ilegible y timeout
 
 **Terminado cuando:** la búsqueda devuelve ofertas reales en Swagger, los fallos simulados devuelven 502/504 y los tests pasan.
 
-**Conceptos:** consumo de APIs REST externas, timeouts, aislar una integración, deserialización JSON y simulación de servicios en tests.
+**Conceptos:** consumo de APIs REST externas, timeouts, aislar una integración, deserialización JSON y simulación de servicios en tests. Además: beans de `@Configuration`, `@Value` con `Duration`, enum con campos, `Optional`, validación de `@RequestParam` (method validation) y logs con SLF4J.
 
 ### Fase 4 — Cierre para el portafolio
 
@@ -142,3 +152,4 @@
 - Mensaje de 400 que indique los valores válidos cuando `status` no existe en el enum (hoy sale el mensaje genérico de Spring)
 - Bloqueo optimista con `@Version` para dos cambios de estado simultáneos sobre la misma candidatura
 - Historial de cambios de estado con fecha
+- Devolver el total de resultados de JobTech junto a la lista ("105 resultados, se muestran 20")
