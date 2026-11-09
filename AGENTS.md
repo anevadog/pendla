@@ -125,6 +125,27 @@ No se empieza la siguiente fase sin aprobación explícita del autor.
 - La IA puede ejecutar comandos de solo lectura: `git status`, `git diff`, `git log`, `git show`, `git branch`, `git remote -v`.
 - No asumir que el autor ha ejecutado un comando. Si no lo ha confirmado, recordárselo antes de continuar.
 
+**Qué se sube al repositorio**
+
+Solo se suben archivos útiles: los que hacen falta para compilar, ejecutar, probar o entender el proyecto. Nada que no aporte.
+
+- **Sí:**
+  - código fuente y tests;
+  - `pom.xml` y el wrapper de Maven (`mvnw`, `mvnw.cmd`, `.mvn/wrapper/`);
+  - configuración necesaria para arrancar, sin secretos;
+  - `README.md`, `AGENTS.md`, `CLAUDE.md` y `docs/`;
+  - `.gitignore` y `.env.example`.
+- **No:**
+  - archivos generados (`target/`), configuración del IDE y logs;
+  - el `.env` real, secretos y datos personales;
+  - archivos temporales, de prueba o de depuración;
+  - notas sueltas, diffs, salidas de comandos, scripts de un solo uso;
+  - archivos vacíos, código comentado o "por si acaso".
+- Los `git add` se proponen siempre con rutas explícitas. Nunca `git add .` ni `git add -A`.
+- Antes de proponer un commit, revisar con `git status` que no entra nada fuera de la lista anterior.
+- Si un archivo no encaja claramente en la lista, se pregunta al autor antes de proponerlo. Si no aporta, no se crea o se borra (con autorización).
+- Todo lo que no se debe subir y se genera solo (IDE, build, logs, `.env`) va a `.gitignore`.
+
 **Cómo se proponen los commits**
 
 Cuando haya un cambio lógico completo y validado, indicar por separado:
