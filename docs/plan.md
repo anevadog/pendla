@@ -2,8 +2,9 @@
 
 ## Estado actual y siguiente paso
 
-- **Fase actual:** Fase 4 en curso. README, Swagger y `docs/decisiones.md` (reescrito en primera persona) terminados; los archivos de trabajo locales ya no se publican. 67 tests en verde.
-- **Siguiente paso:** terminar el ensayo de defensa (3 rondas de preguntas, respondidas en papel) y repasar las respuestas que me hayan costado. Con eso se cierra la Fase 4 y el MVP.
+- **Fase actual:** Fase 4 terminada (2026-11-09). **MVP cerrado:** búsqueda real en JobTech y candidaturas con cambio de estado, README y Swagger completos, decisiones documentadas. 67 tests en verde.
+- **Siguiente paso:** elegir de "Ideas para después" qué entra en la Fase 5 y aprobar su diseño antes de escribir código.
+- **Pendiente del autor (fuera de fases):** el ensayo de defensa. Lo hago en papel a mi ritmo y repaso las respuestas al final del proyecto.
 - **Bloqueos:** ninguno.
 
 ## Requisitos del MVP
@@ -126,7 +127,7 @@
 - [x] README completo, con ejemplos de petición y respuesta
 - [x] Revisar las descripciones de Swagger
 - [x] Repasar `docs/decisiones.md` con mis palabras
-- [ ] Ensayo de defensa: explicar cada clase sin mirar el código
+- [ ] Ensayo de defensa: explicar cada clase sin mirar el código (aplazado: lo hago en papel y lo repaso al final del proyecto)
 
 **Terminado cuando:** el repositorio se entiende sin explicaciones y puedo defender cada decisión.
 
