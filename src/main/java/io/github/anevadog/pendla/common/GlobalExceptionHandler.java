@@ -3,21 +3,27 @@ package io.github.anevadog.pendla.common;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import org.springframework.context.MessageSourceResolvable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
+import org.springframework.validation.method.ParameterValidationResult;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 import io.github.anevadog.pendla.application.DuplicateJobApplicationException;
 import io.github.anevadog.pendla.application.InvalidStatusTransitionException;
 import io.github.anevadog.pendla.application.JobApplicationNotFoundException;
+import io.github.anevadog.pendla.jobsearch.JobTechTimeoutException;
+import io.github.anevadog.pendla.jobsearch.JobTechUnavailableException;
+import io.github.anevadog.pendla.jobsearch.UnsupportedCityException;
 
 /**
  * Single place where exceptions become HTTP error responses (ProblemDetail, RFC 9457).
@@ -42,6 +48,39 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 	@ExceptionHandler(InvalidStatusTransitionException.class)
 	public ProblemDetail handleInvalidTransition(InvalidStatusTransitionException ex) {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+	}
+
+	@ExceptionHandler(UnsupportedCityException.class)
+	public ProblemDetail handleUnsupportedCity(UnsupportedCityException ex) {
+		return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+	}
+
+	/** JobTech failed or answered something we cannot read: the problem is upstream, not in the request. */
+	@ExceptionHandler(JobTechUnavailableException.class)
+	public ProblemDetail handleJobTechUnavailable(JobTechUnavailableException ex) {
+		return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_GATEWAY, ex.getMessage());
+	}
+
+	@ExceptionHandler(JobTechTimeoutException.class)
+	public ProblemDetail handleJobTechTimeout(JobTechTimeoutException ex) {
+		return ProblemDetail.forStatusAndDetail(HttpStatus.GATEWAY_TIMEOUT, ex.getMessage());
+	}
+
+	/** Constraints on @RequestParam failed (e.g. blank keyword): 400 with one message per parameter. */
+	@Override
+	protected ResponseEntity<Object> handleHandlerMethodValidationException(HandlerMethodValidationException ex,
+			HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+		Map<String, String> errors = new LinkedHashMap<>();
+		for (ParameterValidationResult result : ex.getParameterValidationResults()) {
+			String parameter = result.getMethodParameter().getParameterName();
+			for (MessageSourceResolvable error : result.getResolvableErrors()) {
+				errors.putIfAbsent(parameter, error.getDefaultMessage());
+			}
+		}
+
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Invalid request parameters");
+		problem.setProperty("errors", errors);
+		return handleExceptionInternal(ex, problem, headers, status, request);
 	}
 
 	/** @Valid failed on a request body: return 400 with one message per invalid field. */

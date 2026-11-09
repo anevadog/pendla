@@ -62,7 +62,7 @@ Run the tests (no database needed):
 | Method | Path | Description | Status |
 |---|---|---|---|
 | GET | `/api/ping` | Health check, returns `pong` | Done |
-| GET | `/api/jobs?keyword=java&city=Göteborg` | Search job ads in JobTech | Planned |
+| GET | `/api/jobs?keyword=java&city=Göteborg` | Search job ads in JobTech, max 20 (`200`, `400` invalid keyword or city, `502` JobTech error, `504` JobTech timeout). `city` is optional: Stockholm, Göteborg, Malmö or Uppsala | Done |
 | POST | `/api/applications` | Save a job application (`201`, `400` invalid data, `409` duplicate JobTech ad) | Done |
 | GET | `/api/applications` | List applications (newest first) | Done |
 | PATCH | `/api/applications/{id}/status` | Change the status of an application (`200`, `400` invalid status, `404` not found, `409` transition not allowed) | Done |
