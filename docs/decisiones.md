@@ -77,6 +77,57 @@ Mi chuleta para la defensa: qué elegí, qué descarté y por qué.
 - **Elegido:** springdoc 3.2.0, con la versión fijada en una propiedad del `pom.xml`.
 - **Motivo:** la rama 3.x es la de Spring Boot 4. Comprobé en Maven Central que la 3.2.0 está construida sobre Spring Boot 4.1.2, la misma versión del proyecto. springdoc no forma parte de Spring, así que el parent de Spring Boot no gestiona su versión y hay que indicarla a mano.
 
+## Fase 1 — Candidaturas: crear, listar, borrar
+
+### F1-1. Id `Long` generado por PostgreSQL
+
+- **Elegido:** `@GeneratedValue(strategy = GenerationType.IDENTITY)`.
+- **Descartado:** `UUID`.
+- **Motivo:** es simple y legible. UUID sirve cuando los ids se generan en varios sistemas o no deben poder adivinarse, y aquí no se da ninguno de los dos casos.
+
+### F1-2. Duplicados por `jobtechId`: comprobación en el servicio + restricción `unique`
+
+- **Elegido:** el servicio comprueba `existsByJobtechId` y lanza una excepción que se traduce en 409 con un mensaje claro. La columna, además, es `unique` como red de seguridad.
+- **Descartado:** confiar solo en la restricción y capturar la excepción de la base de datos.
+- **Motivo:** la regla de negocio se ve en el servicio y el mensaje de error es claro. Límite conocido: si llegan dos peticiones idénticas a la vez, la segunda choca con la restricción y da 500. Con un solo usuario lo acepto.
+- **Añadido al implementar:** los campos opcionales vacíos (`""`, espacios) se guardan como `null`. Así dos candidaturas sin `jobtechId` no chocan con la restricción `unique`.
+
+### F1-3. Mapeo manual entidad → DTO
+
+- **Elegido:** el método estático `JobApplicationResponse.from(entity)`.
+- **Descartado:** MapStruct.
+- **Motivo:** son 8 campos; no hace falta una librería ni generación de código.
+
+### F1-4. Entidad sin setters
+
+- **Elegido:** un constructor `protected` sin argumentos (lo exige JPA) y un constructor público con los campos obligatorios, que fija el estado `SAVED` y `createdAt`. Solo getters.
+- **Descartado:** getters y setters para todo.
+- **Motivo:** la entidad no puede quedar en un estado incoherente desde fuera. El cambio de estado tendrá su propio método en la Fase 2.
+
+### F1-5. `@URL` para validar la url
+
+- **Elegido:** `@URL` de Hibernate Validator.
+- **Descartado:** `@Pattern` con una expresión regular.
+- **Motivo:** se lee mejor y valida el formato de verdad. Hay que saber que es de Hibernate, no del estándar Jakarta, y que acepta otros protocolos además de `http(s)`.
+
+### F1-6. `spring.jpa.open-in-view=false`
+
+- **Elegido:** desactivar Open Session in View.
+- **Descartado:** dejar el valor por defecto (`true`), que además muestra un aviso al arrancar.
+- **Motivo:** la sesión de base de datos se cierra al terminar el método del servicio. Como las entidades se convierten en DTOs dentro del servicio, el controlador nunca necesita la sesión. Con OSIV activo, una carga perezosa en el controlador lanzaría consultas sin que se note.
+
+### F1-7. Aviso de Mockito con Java 25
+
+- **Elegido:** ignorarlo por ahora; está apuntado en "Ideas para después".
+- **Descartado:** configurar Mockito como agente en el `pom.xml`.
+- **Motivo:** es solo un aviso y todo funciona. Configurarlo añade complejidad al build sin aportar nada al MVP.
+
+### F1-8. Manejo de errores heredando de `ResponseEntityExceptionHandler`
+
+- **Elegido:** `GlobalExceptionHandler` hereda de `ResponseEntityExceptionHandler` y sobrescribe `handleMethodArgumentNotValid` para devolver los errores por campo.
+- **Descartado:** activar `spring.mvc.problemdetails.enabled` (lo aprobado en el diseño) o poner `@Order(Ordered.HIGHEST_PRECEDENCE)` en nuestra clase.
+- **Motivo:** al implementar, los tests demostraron que con esa propiedad Spring Boot registra su propio manejador con `@Order(0)`, que atendía la validación antes que el nuestro y respondía sin los errores por campo. Heredando, Spring Boot deja de registrar el suyo: queda un solo manejador que también responde con `ProblemDetail` a los errores propios de Spring MVC (JSON mal formado, id no numérico…).
+
 ### Stack
 
 | Decisión | Elegido | Descartado | Motivo |

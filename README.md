@@ -63,10 +63,23 @@ Run the tests (no database needed):
 |---|---|---|---|
 | GET | `/api/ping` | Health check, returns `pong` | Done |
 | GET | `/api/jobs?keyword=java&city=Göteborg` | Search job ads in JobTech | Planned |
-| POST | `/api/applications` | Save a job application | Planned |
-| GET | `/api/applications` | List applications (newest first) | Planned |
+| POST | `/api/applications` | Save a job application (`201`, `400` invalid data, `409` duplicate JobTech ad) | Done |
+| GET | `/api/applications` | List applications (newest first) | Done |
 | PATCH | `/api/applications/{id}/status` | Change the status of an application | Planned |
-| DELETE | `/api/applications/{id}` | Delete an application | Planned |
+| DELETE | `/api/applications/{id}` | Delete an application (`204`, `404` not found) | Done |
+
+Errors are returned as [`ProblemDetail`](https://www.rfc-editor.org/rfc/rfc9457) JSON. Validation errors include one message per invalid field:
+
+```json
+{
+  "type": "about:blank",
+  "title": "Bad Request",
+  "status": 400,
+  "detail": "Invalid request data",
+  "instance": "/api/applications",
+  "errors": { "title": "must not be blank" }
+}
+```
 
 ### Status transitions
 

@@ -2,10 +2,9 @@
 
 ## Estado actual y siguiente paso
 
-- **Fase actual:** Fase 0 terminada (2026-11-09). La aplicación arranca contra PostgreSQL, `/api/ping` responde `pong` y Swagger lo muestra.
-- **Siguiente paso:** planificar y aprobar el diseño de la Fase 1 (candidaturas: crear, listar, borrar).
+- **Fase actual:** Fase 1 terminada (2026-11-09). Crear, listar y borrar candidaturas funciona contra PostgreSQL; 19 tests en verde.
+- **Siguiente paso:** planificar y aprobar el diseño de la Fase 2 (cambio de estado con reglas de transición). La entidad necesitará un método para cambiar el estado (hoy no tiene setters, F1-4).
 - **Bloqueos:** ninguno.
-- **A tener en cuenta:** en Fase 1 aparecerá el aviso de Mockito "self-attaching" con Java 25. Es inofensivo, pero hay que decidir si se configura Mockito como agente en el `pom.xml`.
 
 ## Requisitos del MVP
 
@@ -52,13 +51,13 @@
 
 **Objetivo:** RF-04, RF-05 y RF-07 funcionando de punta a punta.
 
-- [ ] Entidad `JobApplication` y enum de estado
-- [ ] `JobApplicationRepository` (Spring Data JPA)
-- [ ] DTOs de petición y respuesta (`record`) y su mapeo
-- [ ] `JobApplicationService` con la lógica, incluida la comprobación de duplicados por `jobtechId`
-- [ ] `JobApplicationController` con validación de entrada
-- [ ] `@ControllerAdvice` con `ProblemDetail` (400, 404, 409)
-- [ ] Tests de servicio y de controlador
+- [x] Entidad `JobApplication` y enum de estado
+- [x] `JobApplicationRepository` (Spring Data JPA)
+- [x] DTOs de petición y respuesta (`record`) y su mapeo
+- [x] `JobApplicationService` con la lógica, incluida la comprobación de duplicados por `jobtechId`
+- [x] `JobApplicationController` con validación de entrada
+- [x] `@ControllerAdvice` con `ProblemDetail` (400, 404, 409)
+- [x] Tests de servicio y de controlador
 
 **Terminado cuando:** se pueden crear, listar y borrar candidaturas en Swagger, se guardan en PostgreSQL y los tests pasan.
 
@@ -136,3 +135,7 @@
 - Editar los campos de una candidatura
 - `GET /api/applications/{id}`
 - Tests de integración contra PostgreSQL real (Testcontainers, requiere Docker)
+- Paginación del listado de candidaturas (`Pageable`)
+- Configurar Mockito como agente en `maven-surefire-plugin` (quita el aviso "self-attaching" de Java 25)
+- Mensajes de validación en un idioma fijo (hoy dependen del idioma de la JVM)
+- Convertir el choque con la restricción `unique` de `jobtech_id` (dos peticiones a la vez) en 409 en lugar de 500
