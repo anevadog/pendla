@@ -16,6 +16,7 @@ import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 import io.github.anevadog.pendla.application.DuplicateJobApplicationException;
+import io.github.anevadog.pendla.application.InvalidStatusTransitionException;
 import io.github.anevadog.pendla.application.JobApplicationNotFoundException;
 
 /**
@@ -34,6 +35,12 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
 	@ExceptionHandler(DuplicateJobApplicationException.class)
 	public ProblemDetail handleDuplicate(DuplicateJobApplicationException ex) {
+		return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+	}
+
+	/** The request is well formed but conflicts with the current status of the application. */
+	@ExceptionHandler(InvalidStatusTransitionException.class)
+	public ProblemDetail handleInvalidTransition(InvalidStatusTransitionException ex) {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
 	}
 

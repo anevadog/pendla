@@ -1,12 +1,14 @@
 package io.github.anevadog.pendla.application;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -120,6 +122,71 @@ class JobApplicationControllerTest {
 		mockMvc.perform(get("/api/applications"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$").isEmpty());
+	}
+
+	@Test
+	void changeStatus_validTransition_returns200() throws Exception {
+		var updated = new JobApplicationResponse(1L, null, "Java Developer", "Deploja AB",
+				null, null, ApplicationStatus.SENT, Instant.parse("2026-11-09T10:00:00Z"));
+		when(service.changeStatus(eq(1L), any())).thenReturn(updated);
+
+		mockMvc.perform(patch("/api/applications/1/status")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+						{"status": "SENT"}
+						"""))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.id").value(1))
+				.andExpect(jsonPath("$.status").value("SENT"));
+	}
+
+	@Test
+	void changeStatus_unknownId_returns404() throws Exception {
+		when(service.changeStatus(eq(99L), any())).thenThrow(new JobApplicationNotFoundException(99L));
+
+		mockMvc.perform(patch("/api/applications/99/status")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+						{"status": "SENT"}
+						"""))
+				.andExpect(status().isNotFound())
+				.andExpect(jsonPath("$.detail").value("Job application 99 not found"));
+	}
+
+	@Test
+	void changeStatus_missingStatus_returns400() throws Exception {
+		mockMvc.perform(patch("/api/applications/1/status")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{}"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.errors.status").exists());
+		verify(service, never()).changeStatus(any(), any());
+	}
+
+	@Test
+	void changeStatus_unknownStatusValue_returns400() throws Exception {
+		mockMvc.perform(patch("/api/applications/1/status")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+						{"status": "FOO"}
+						"""))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.status").value(400));
+		verify(service, never()).changeStatus(any(), any());
+	}
+
+	@Test
+	void changeStatus_invalidTransition_returns409() throws Exception {
+		when(service.changeStatus(eq(1L), any())).thenThrow(
+				new InvalidStatusTransitionException(ApplicationStatus.REJECTED, ApplicationStatus.SENT));
+
+		mockMvc.perform(patch("/api/applications/1/status")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+						{"status": "SENT"}
+						"""))
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.detail").value("Cannot change status from REJECTED to SENT"));
 	}
 
 	@Test

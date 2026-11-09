@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -18,6 +19,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import io.github.anevadog.pendla.application.dto.CreateJobApplicationRequest;
 import io.github.anevadog.pendla.application.dto.JobApplicationResponse;
+import io.github.anevadog.pendla.application.dto.UpdateStatusRequest;
 
 /**
  * Unit tests: the repository is a Mockito mock, no Spring context and no database.
@@ -101,6 +103,37 @@ class JobApplicationServiceTest {
 		when(repository.findAllByOrderByCreatedAtDesc()).thenReturn(List.of());
 
 		assertThat(service.findAll()).isEmpty();
+	}
+
+	@Test
+	void changeStatus_validTransition_returnsUpdatedStatus() {
+		var application = new JobApplication(null, "Java Developer", "Deploja AB", null, null);
+		when(repository.findById(1L)).thenReturn(Optional.of(application));
+
+		JobApplicationResponse response = service.changeStatus(1L, new UpdateStatusRequest(ApplicationStatus.SENT));
+
+		assertThat(response.status()).isEqualTo(ApplicationStatus.SENT);
+		// Dirty checking saves the change: the service must not call save()
+		verify(repository, never()).save(any());
+	}
+
+	@Test
+	void changeStatus_invalidTransition_throwsInvalidStatusTransitionException() {
+		var application = new JobApplication(null, "Java Developer", "Deploja AB", null, null);
+		when(repository.findById(1L)).thenReturn(Optional.of(application));
+
+		assertThatThrownBy(() -> service.changeStatus(1L, new UpdateStatusRequest(ApplicationStatus.OFFER)))
+				.isInstanceOf(InvalidStatusTransitionException.class)
+				.hasMessage("Cannot change status from SAVED to OFFER");
+	}
+
+	@Test
+	void changeStatus_unknownId_throwsNotFound() {
+		when(repository.findById(99L)).thenReturn(Optional.empty());
+
+		assertThatThrownBy(() -> service.changeStatus(99L, new UpdateStatusRequest(ApplicationStatus.SENT)))
+				.isInstanceOf(JobApplicationNotFoundException.class)
+				.hasMessageContaining("99");
 	}
 
 	@Test

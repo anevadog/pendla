@@ -7,6 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import io.github.anevadog.pendla.application.dto.CreateJobApplicationRequest;
 import io.github.anevadog.pendla.application.dto.JobApplicationResponse;
+import io.github.anevadog.pendla.application.dto.UpdateStatusRequest;
 
 /**
  * Business logic for job applications. Receives and returns DTOs; entities stay inside.
@@ -44,6 +45,18 @@ public class JobApplicationService {
 		return repository.findAllByOrderByCreatedAtDesc().stream()
 				.map(JobApplicationResponse::from)
 				.toList();
+	}
+
+	@Transactional
+	public JobApplicationResponse changeStatus(Long id, UpdateStatusRequest request) {
+		JobApplication application = repository.findById(id)
+				.orElseThrow(() -> new JobApplicationNotFoundException(id));
+
+		application.changeStatus(request.status());
+
+		// No save() needed: the entity is managed inside this transaction,
+		// so Hibernate detects the change (dirty checking) and runs the UPDATE on commit.
+		return JobApplicationResponse.from(application);
 	}
 
 	@Transactional

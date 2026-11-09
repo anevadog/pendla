@@ -65,7 +65,7 @@ Run the tests (no database needed):
 | GET | `/api/jobs?keyword=java&city=Göteborg` | Search job ads in JobTech | Planned |
 | POST | `/api/applications` | Save a job application (`201`, `400` invalid data, `409` duplicate JobTech ad) | Done |
 | GET | `/api/applications` | List applications (newest first) | Done |
-| PATCH | `/api/applications/{id}/status` | Change the status of an application | Planned |
+| PATCH | `/api/applications/{id}/status` | Change the status of an application (`200`, `400` invalid status, `404` not found, `409` transition not allowed) | Done |
 | DELETE | `/api/applications/{id}` | Delete an application (`204`, `404` not found) | Done |
 
 Errors are returned as [`ProblemDetail`](https://www.rfc-editor.org/rfc/rfc9457) JSON. Validation errors include one message per invalid field:
@@ -90,7 +90,7 @@ Errors are returned as [`ProblemDetail`](https://www.rfc-editor.org/rfc/rfc9457)
 | `INTERVIEW` | `OFFER`, `REJECTED` |
 | `REJECTED`, `OFFER` | — (final) |
 
-An invalid transition returns `409 Conflict`.
+An invalid transition returns `409 Conflict`. Setting the status an application already has also counts as an invalid transition.
 
 ## Data source
 
