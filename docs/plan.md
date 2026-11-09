@@ -2,8 +2,8 @@
 
 ## Estado actual y siguiente paso
 
-- **Fase actual:** Fase 1 terminada (2026-11-09). Crear, listar y borrar candidaturas funciona contra PostgreSQL; 19 tests en verde.
-- **Siguiente paso:** planificar y aprobar el diseño de la Fase 2 (cambio de estado con reglas de transición). La entidad necesitará un método para cambiar el estado (hoy no tiene setters, F1-4).
+- **Fase actual:** Fase 2 terminada (2026-11-09). El CRUD de candidaturas y el cambio de estado con reglas de transición funcionan contra PostgreSQL (probado en Swagger); 49 tests en verde.
+- **Siguiente paso:** planificar y aprobar el diseño de la Fase 3 (búsqueda en JobTech). Lo primero es verificar los códigos de municipio reales de las ciudades admitidas (D2).
 - **Bloqueos:** ninguno.
 
 ## Requisitos del MVP
@@ -67,14 +67,14 @@
 
 **Objetivo:** RF-06 con las reglas de transición.
 
-- [ ] Transiciones permitidas definidas en el enum
-- [ ] `PATCH /api/applications/{id}/status`
-- [ ] Excepción de transición inválida → 409
-- [ ] Tests de transiciones válidas, inválidas, desde estado final e id inexistente
+- [x] Transiciones permitidas definidas en el enum
+- [x] `PATCH /api/applications/{id}/status`
+- [x] Excepción de transición inválida → 409
+- [x] Tests de transiciones válidas, inválidas, desde estado final e id inexistente
 
 **Terminado cuando:** las transiciones funcionan en Swagger según la tabla del README y los tests pasan.
 
-**Conceptos:** lógica de dominio en enums, PATCH frente a PUT, 409 frente a 400.
+**Conceptos:** lógica de dominio en enums, PATCH frente a PUT, 409 frente a 400, `switch` exhaustivo, dirty checking de JPA y tests parametrizados.
 
 ### Fase 3 — Búsqueda en JobTech
 
@@ -139,3 +139,6 @@
 - Configurar Mockito como agente en `maven-surefire-plugin` (quita el aviso "self-attaching" de Java 25)
 - Mensajes de validación en un idioma fijo (hoy dependen del idioma de la JVM)
 - Convertir el choque con la restricción `unique` de `jobtech_id` (dos peticiones a la vez) en 409 en lugar de 500
+- Mensaje de 400 que indique los valores válidos cuando `status` no existe en el enum (hoy sale el mensaje genérico de Spring)
+- Bloqueo optimista con `@Version` para dos cambios de estado simultáneos sobre la misma candidatura
+- Historial de cambios de estado con fecha

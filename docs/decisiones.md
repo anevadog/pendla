@@ -128,6 +128,33 @@ Mi chuleta para la defensa: qué elegí, qué descarté y por qué.
 - **Descartado:** activar `spring.mvc.problemdetails.enabled` (lo aprobado en el diseño) o poner `@Order(Ordered.HIGHEST_PRECEDENCE)` en nuestra clase.
 - **Motivo:** al implementar, los tests demostraron que con esa propiedad Spring Boot registra su propio manejador con `@Order(0)`, que atendía la validación antes que el nuestro y respondía sin los errores por campo. Heredando, Spring Boot deja de registrar el suyo: queda un solo manejador que también responde con `ProblemDetail` a los errores propios de Spring MVC (JSON mal formado, id no numérico…).
 
+## Fase 2 — Cambio de estado
+
+### F2-1. Reglas de transición en el enum, aplicadas por la entidad
+
+- **Elegido:** `ApplicationStatus.canTransitionTo(target)` con un `switch` sin `default`, y `JobApplication.changeStatus(newStatus)` lanza `InvalidStatusTransitionException` si la transición no está permitida.
+- **Descartado:** un `Map<ApplicationStatus, Set<ApplicationStatus>>` en el servicio. Tampoco sirve un `EnumSet` en el constructor de cada constante, porque Java no deja referirse a constantes que se declaran más abajo (`SAVED(EnumSet.of(SENT))` no compila).
+- **Motivo:** la regla vive en el dominio y se prueba sin Spring ni Mockito. `changeStatus` es la única forma de cambiar el estado, así que nadie puede saltarse la regla, y se mantiene la idea de F1-4. Al no tener `default`, el `switch` obliga a decidir las transiciones de cualquier estado nuevo antes de que el código compile.
+
+### F2-2. Guardar con dirty checking, sin `save()`
+
+- **Elegido:** el servicio carga la entidad con `findById` dentro de `@Transactional`, cambia el estado y no llama a `save()`. Hibernate detecta el cambio y lanza el `UPDATE` al hacer el commit.
+- **Descartado:** llamar a `repository.save(application)` de forma explícita.
+- **Motivo:** así funciona JPA con entidades gestionadas, y llamar a `save()` sería redundante. Riesgo: si se quita `@Transactional`, el cambio no se guarda y los tests con mocks no lo detectan. Lo comprobé a mano en Swagger contra PostgreSQL.
+
+### F2-3. Cambiar al mismo estado → 409
+
+- **Elegido:** `SENT → SENT` es una transición no permitida y devuelve 409.
+- **Descartado:** responder 200 sin cambios (idempotente).
+- **Motivo:** queda una sola regla, la tabla de transiciones, sin casos especiales. El cliente sabe en qué estado está la candidatura, así que pedir el mismo estado es un error suyo.
+
+### F2-4. `PATCH /api/applications/{id}/status`
+
+- **Elegido:** `PATCH` en una subruta, con el cuerpo `{"status": "SENT"}`.
+- **Descartado:** `PUT /api/applications/{id}` con la candidatura completa.
+- **Motivo:** solo cambia un campo. `PUT` significa reemplazar el recurso entero y obligaría a reenviar todos los datos. La subruta deja claro que solo se toca el estado.
+- **Límite conocido:** un valor que no existe en el enum (`"FOO"`) devuelve 400 con el mensaje genérico de Spring, sin decir qué valores son válidos. Mejorarlo queda en "Ideas para después".
+
 ### Stack
 
 | Decisión | Elegido | Descartado | Motivo |
