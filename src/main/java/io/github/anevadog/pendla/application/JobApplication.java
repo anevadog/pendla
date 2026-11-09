@@ -61,6 +61,18 @@ public class JobApplication {
 		this.createdAt = Instant.now();
 	}
 
+	/**
+	 * The only way to change the status: the transition rules live in ApplicationStatus.
+	 *
+	 * @throws InvalidStatusTransitionException if the current status cannot move to newStatus
+	 */
+	public void changeStatus(ApplicationStatus newStatus) {
+		if (!status.canTransitionTo(newStatus)) {
+			throw new InvalidStatusTransitionException(status, newStatus);
+		}
+		this.status = newStatus;
+	}
+
 	public Long getId() {
 		return id;
 	}
