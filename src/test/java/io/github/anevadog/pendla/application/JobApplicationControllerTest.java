@@ -1,0 +1,97 @@
+package io.github.anevadog.pendla.application;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.time.Instant;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+
+import io.github.anevadog.pendla.application.dto.JobApplicationResponse;
+
+/**
+ * Web layer tests: real controller, validation and GlobalExceptionHandler; the service is a mock.
+ */
+@WebMvcTest(JobApplicationController.class)
+class JobApplicationControllerTest {
+
+	@Autowired
+	private MockMvc mockMvc;
+
+	@MockitoBean
+	private JobApplicationService service;
+
+	@Test
+	void createApplication_withValidBody_returns201() throws Exception {
+		var saved = new JobApplicationResponse(1L, "31696992", "Java Developer", "Deploja AB",
+				"Stockholm", "https://example.com/ad", ApplicationStatus.SAVED, Instant.parse("2026-11-09T10:00:00Z"));
+		when(service.create(any())).thenReturn(saved);
+
+		mockMvc.perform(post("/api/applications")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+						{"jobtechId": "31696992", "title": "Java Developer", "employer": "Deploja AB",
+						 "city": "Stockholm", "url": "https://example.com/ad"}
+						"""))
+				.andExpect(status().isCreated())
+				.andExpect(jsonPath("$.id").value(1))
+				.andExpect(jsonPath("$.status").value("SAVED"))
+				.andExpect(jsonPath("$.title").value("Java Developer"));
+	}
+
+	@Test
+	void createApplication_withBlankTitle_returns400() throws Exception {
+		mockMvc.perform(post("/api/applications")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+						{"title": "  ", "employer": "Deploja AB"}
+						"""))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.errors.title").exists());
+		verify(service, never()).create(any());
+	}
+
+	@Test
+	void createApplication_withInvalidUrl_returns400() throws Exception {
+		mockMvc.perform(post("/api/applications")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+						{"title": "Java Developer", "employer": "Deploja AB", "url": "not a url"}
+						"""))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.errors.url").exists());
+	}
+
+	@Test
+	void createApplication_withMalformedJson_returns400() throws Exception {
+		mockMvc.perform(post("/api/applications")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"title\": "))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.status").value(400));
+	}
+
+	@Test
+	void createApplication_withDuplicateJobtechId_returns409() throws Exception {
+		when(service.create(any())).thenThrow(new DuplicateJobApplicationException("31696992"));
+
+		mockMvc.perform(post("/api/applications")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+						{"jobtechId": "31696992", "title": "Java Developer", "employer": "Deploja AB"}
+						"""))
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.detail").value("An application for JobTech ad 31696992 already exists"));
+	}
+
+}
