@@ -1,9 +1,11 @@
 package io.github.anevadog.pendla.application;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -118,6 +120,29 @@ class JobApplicationControllerTest {
 		mockMvc.perform(get("/api/applications"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$").isEmpty());
+	}
+
+	@Test
+	void deleteApplication_returns204() throws Exception {
+		mockMvc.perform(delete("/api/applications/1"))
+				.andExpect(status().isNoContent());
+		verify(service).delete(1L);
+	}
+
+	@Test
+	void deleteApplication_withUnknownId_returns404() throws Exception {
+		doThrow(new JobApplicationNotFoundException(99L)).when(service).delete(99L);
+
+		mockMvc.perform(delete("/api/applications/99"))
+				.andExpect(status().isNotFound())
+				.andExpect(jsonPath("$.detail").value("Job application 99 not found"));
+	}
+
+	@Test
+	void deleteApplication_withNonNumericId_returns400() throws Exception {
+		mockMvc.perform(delete("/api/applications/abc"))
+				.andExpect(status().isBadRequest());
+		verify(service, never()).delete(any());
 	}
 
 }

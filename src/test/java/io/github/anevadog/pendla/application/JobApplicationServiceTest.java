@@ -103,4 +103,23 @@ class JobApplicationServiceTest {
 		assertThat(service.findAll()).isEmpty();
 	}
 
+	@Test
+	void delete_withExistingId_deletes() {
+		when(repository.existsById(1L)).thenReturn(true);
+
+		service.delete(1L);
+
+		verify(repository).deleteById(1L);
+	}
+
+	@Test
+	void delete_withUnknownId_throwsNotFound() {
+		when(repository.existsById(99L)).thenReturn(false);
+
+		assertThatThrownBy(() -> service.delete(99L))
+				.isInstanceOf(JobApplicationNotFoundException.class)
+				.hasMessageContaining("99");
+		verify(repository, never()).deleteById(any());
+	}
+
 }

@@ -16,6 +16,7 @@ import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 import io.github.anevadog.pendla.application.DuplicateJobApplicationException;
+import io.github.anevadog.pendla.application.JobApplicationNotFoundException;
 
 /**
  * Single place where exceptions become HTTP error responses (ProblemDetail, RFC 9457).
@@ -25,6 +26,11 @@ import io.github.anevadog.pendla.application.DuplicateJobApplicationException;
  */
 @RestControllerAdvice
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
+
+	@ExceptionHandler(JobApplicationNotFoundException.class)
+	public ProblemDetail handleNotFound(JobApplicationNotFoundException ex) {
+		return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+	}
 
 	@ExceptionHandler(DuplicateJobApplicationException.class)
 	public ProblemDetail handleDuplicate(DuplicateJobApplicationException ex) {

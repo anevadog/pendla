@@ -46,6 +46,14 @@ public class JobApplicationService {
 				.toList();
 	}
 
+	@Transactional
+	public void delete(Long id) {
+		if (!repository.existsById(id)) {
+			throw new JobApplicationNotFoundException(id);
+		}
+		repository.deleteById(id);
+	}
+
 	/** Optional fields: store "" or "   " as null, so empty values mean the same thing everywhere. */
 	private static String blankToNull(String value) {
 		return (value == null || value.isBlank()) ? null : value.trim();
