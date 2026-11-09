@@ -2,8 +2,8 @@
 
 ## Estado actual y siguiente paso
 
-- **Fase actual:** Fase 4 en curso. README y Swagger terminados; `AGENTS.md` y `CLAUDE.md` ya no se publican. 67 tests en verde.
-- **Siguiente paso (autor):** reescribir `docs/decisiones.md` con mis palabras (D2 y F1-8 están desactualizadas: ver la entrega 3) y terminar el ensayo de defensa con la chuleta local (`chuleta-defensa.md`, 3 rondas). Después, la IA corrige las respuestas que quiera y comprueba que `decisiones.md` sigue coincidiendo con el código.
+- **Fase actual:** Fase 4 en curso. README, Swagger y `docs/decisiones.md` (reescrito en primera persona) terminados; los archivos de trabajo locales ya no se publican. 67 tests en verde.
+- **Siguiente paso:** terminar el ensayo de defensa (3 rondas de preguntas, respondidas en papel) y repasar las respuestas que me hayan costado. Con eso se cierra la Fase 4 y el MVP.
 - **Bloqueos:** ninguno.
 
 ## Requisitos del MVP
@@ -125,7 +125,7 @@
 
 - [x] README completo, con ejemplos de petición y respuesta
 - [x] Revisar las descripciones de Swagger
-- [ ] Repasar `docs/decisiones.md` con mis palabras
+- [x] Repasar `docs/decisiones.md` con mis palabras
 - [ ] Ensayo de defensa: explicar cada clase sin mirar el código
 
 **Terminado cuando:** el repositorio se entiende sin explicaciones y puedo defender cada decisión.
