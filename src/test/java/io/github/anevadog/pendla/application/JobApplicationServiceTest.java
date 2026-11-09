@@ -8,6 +8,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.List;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -79,6 +81,26 @@ class JobApplicationServiceTest {
 		assertThat(response.city()).isNull();
 		assertThat(response.url()).isNull();
 		verify(repository, never()).existsByJobtechId(anyString());
+	}
+
+	@Test
+	void findAll_returnsResponsesInRepositoryOrder() {
+		var newest = new JobApplication(null, "Backend Developer", "Spotify", "Stockholm", null);
+		var oldest = new JobApplication(null, "Java Developer", "Deploja AB", "Stockholm", null);
+		when(repository.findAllByOrderByCreatedAtDesc()).thenReturn(List.of(newest, oldest));
+
+		List<JobApplicationResponse> responses = service.findAll();
+
+		assertThat(responses)
+				.extracting(JobApplicationResponse::title)
+				.containsExactly("Backend Developer", "Java Developer");
+	}
+
+	@Test
+	void findAll_withNoApplications_returnsEmptyList() {
+		when(repository.findAllByOrderByCreatedAtDesc()).thenReturn(List.of());
+
+		assertThat(service.findAll()).isEmpty();
 	}
 
 }

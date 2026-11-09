@@ -4,11 +4,13 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.Instant;
+import java.util.List;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -92,6 +94,30 @@ class JobApplicationControllerTest {
 						"""))
 				.andExpect(status().isConflict())
 				.andExpect(jsonPath("$.detail").value("An application for JobTech ad 31696992 already exists"));
+	}
+
+	@Test
+	void listApplications_returns200WithList() throws Exception {
+		var first = new JobApplicationResponse(2L, null, "Backend Developer", "Spotify",
+				"Stockholm", null, ApplicationStatus.SENT, Instant.parse("2026-11-09T12:00:00Z"));
+		var second = new JobApplicationResponse(1L, "31696992", "Java Developer", "Deploja AB",
+				"Stockholm", null, ApplicationStatus.SAVED, Instant.parse("2026-11-09T10:00:00Z"));
+		when(service.findAll()).thenReturn(List.of(first, second));
+
+		mockMvc.perform(get("/api/applications"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.length()").value(2))
+				.andExpect(jsonPath("$[0].id").value(2))
+				.andExpect(jsonPath("$[1].id").value(1));
+	}
+
+	@Test
+	void listApplications_withNoApplications_returnsEmptyArray() throws Exception {
+		when(service.findAll()).thenReturn(List.of());
+
+		mockMvc.perform(get("/api/applications"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$").isEmpty());
 	}
 
 }

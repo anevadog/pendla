@@ -1,5 +1,7 @@
 package io.github.anevadog.pendla.application;
 
+import java.util.List;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,6 +36,14 @@ public class JobApplicationService {
 				blankToNull(request.url()));
 
 		return JobApplicationResponse.from(repository.save(application));
+	}
+
+	/** All applications, newest first. readOnly tells Hibernate it does not need to track changes. */
+	@Transactional(readOnly = true)
+	public List<JobApplicationResponse> findAll() {
+		return repository.findAllByOrderByCreatedAtDesc().stream()
+				.map(JobApplicationResponse::from)
+				.toList();
 	}
 
 	/** Optional fields: store "" or "   " as null, so empty values mean the same thing everywhere. */
