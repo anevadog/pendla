@@ -16,6 +16,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import io.github.anevadog.pendla.application.dto.CreateJobApplicationRequest;
 import io.github.anevadog.pendla.application.dto.JobApplicationResponse;
@@ -38,8 +39,8 @@ class JobApplicationServiceTest {
 		var request = new CreateJobApplicationRequest(
 				"31696992", " Java Developer ", "Deploja AB", "Stockholm", "https://example.com/ad");
 		when(repository.existsByJobtechId("31696992")).thenReturn(false);
-		// save() returns the same entity it receives
-		when(repository.save(any(JobApplication.class))).thenAnswer(invocation -> invocation.getArgument(0));
+		// saveAndFlush() returns the same entity it receives
+		when(repository.saveAndFlush(any(JobApplication.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
 		JobApplicationResponse response = service.create(request);
 
@@ -58,13 +59,36 @@ class JobApplicationServiceTest {
 		assertThatThrownBy(() -> service.create(request))
 				.isInstanceOf(DuplicateJobApplicationException.class)
 				.hasMessageContaining("31696992");
-		verify(repository, never()).save(any());
+		verify(repository, never()).saveAndFlush(any());
+	}
+
+	@Test
+	void create_whenUniqueConstraintFails_throwsDuplicate() {
+		// Race: the check finds nothing, but another request inserts the same jobtechId before ours
+		var request = new CreateJobApplicationRequest("31696992", "Java Developer", "Deploja AB", null, null);
+		when(repository.existsByJobtechId("31696992")).thenReturn(false);
+		when(repository.saveAndFlush(any(JobApplication.class)))
+				.thenThrow(new DataIntegrityViolationException("duplicate key"));
+
+		assertThatThrownBy(() -> service.create(request))
+				.isInstanceOf(DuplicateJobApplicationException.class)
+				.hasMessageContaining("31696992");
+	}
+
+	@Test
+	void create_whenIntegrityFailsWithoutJobtechId_rethrowsOriginal() {
+		var request = new CreateJobApplicationRequest(null, "Java Developer", "Deploja AB", null, null);
+		when(repository.saveAndFlush(any(JobApplication.class)))
+				.thenThrow(new DataIntegrityViolationException("other constraint"));
+
+		assertThatThrownBy(() -> service.create(request))
+				.isInstanceOf(DataIntegrityViolationException.class);
 	}
 
 	@Test
 	void create_withoutJobtechId_skipsDuplicateCheck() {
 		var request = new CreateJobApplicationRequest(null, "Java Developer", "Deploja AB", null, null);
-		when(repository.save(any(JobApplication.class))).thenAnswer(invocation -> invocation.getArgument(0));
+		when(repository.saveAndFlush(any(JobApplication.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
 		JobApplicationResponse response = service.create(request);
 
@@ -75,7 +99,7 @@ class JobApplicationServiceTest {
 	@Test
 	void create_withBlankOptionalFields_storesNull() {
 		var request = new CreateJobApplicationRequest("  ", "Java Developer", "Deploja AB", "", " ");
-		when(repository.save(any(JobApplication.class))).thenAnswer(invocation -> invocation.getArgument(0));
+		when(repository.saveAndFlush(any(JobApplication.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
 		JobApplicationResponse response = service.create(request);
 

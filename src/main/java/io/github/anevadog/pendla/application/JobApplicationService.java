@@ -2,6 +2,7 @@ package io.github.anevadog.pendla.application;
 
 import java.util.List;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,7 +37,17 @@ public class JobApplicationService {
 				blankToNull(request.city()),
 				blankToNull(request.url()));
 
-		return JobApplicationResponse.from(repository.save(application));
+		try {
+			// saveAndFlush runs the INSERT now, so a database error surfaces here and not at commit
+			return JobApplicationResponse.from(repository.saveAndFlush(application));
+		} catch (DataIntegrityViolationException ex) {
+			// Two requests with the same jobtechId at the same time: both pass the check above,
+			// and the unique constraint rejects the second INSERT. Same answer as the check: 409.
+			if (jobtechId != null) {
+				throw new DuplicateJobApplicationException(jobtechId);
+			}
+			throw ex;
+		}
 	}
 
 	/**
