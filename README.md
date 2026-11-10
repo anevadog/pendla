@@ -1,5 +1,7 @@
 # Pendla
 
+[![CI](https://github.com/anevadog/pendla/actions/workflows/ci.yml/badge.svg)](https://github.com/anevadog/pendla/actions/workflows/ci.yml)
+
 A small REST API to track my job search in Sweden.
 
 Pendla does two things:
