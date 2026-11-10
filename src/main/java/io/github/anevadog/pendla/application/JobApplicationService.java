@@ -39,10 +39,17 @@ public class JobApplicationService {
 		return JobApplicationResponse.from(repository.save(application));
 	}
 
-	/** All applications, newest first. readOnly tells Hibernate it does not need to track changes. */
+	/**
+	 * Applications, newest first. A null status means no filter.
+	 * readOnly tells Hibernate it does not need to track changes.
+	 */
 	@Transactional(readOnly = true)
-	public List<JobApplicationResponse> findAll() {
-		return repository.findAllByOrderByCreatedAtDesc().stream()
+	public List<JobApplicationResponse> findAll(ApplicationStatus status) {
+		List<JobApplication> applications = (status == null)
+				? repository.findAllByOrderByCreatedAtDesc()
+				: repository.findAllByStatusOrderByCreatedAtDesc(status);
+
+		return applications.stream()
 				.map(JobApplicationResponse::from)
 				.toList();
 	}

@@ -91,18 +91,32 @@ class JobApplicationServiceTest {
 		var oldest = new JobApplication(null, "Java Developer", "Deploja AB", "Stockholm", null);
 		when(repository.findAllByOrderByCreatedAtDesc()).thenReturn(List.of(newest, oldest));
 
-		List<JobApplicationResponse> responses = service.findAll();
+		List<JobApplicationResponse> responses = service.findAll(null);
 
 		assertThat(responses)
 				.extracting(JobApplicationResponse::title)
 				.containsExactly("Backend Developer", "Java Developer");
+		verify(repository, never()).findAllByStatusOrderByCreatedAtDesc(any());
 	}
 
 	@Test
 	void findAll_withNoApplications_returnsEmptyList() {
 		when(repository.findAllByOrderByCreatedAtDesc()).thenReturn(List.of());
 
-		assertThat(service.findAll()).isEmpty();
+		assertThat(service.findAll(null)).isEmpty();
+	}
+
+	@Test
+	void findAll_withStatus_usesFilteredQuery() {
+		var saved = new JobApplication(null, "Java Developer", "Deploja AB", "Stockholm", null);
+		when(repository.findAllByStatusOrderByCreatedAtDesc(ApplicationStatus.SAVED)).thenReturn(List.of(saved));
+
+		List<JobApplicationResponse> responses = service.findAll(ApplicationStatus.SAVED);
+
+		assertThat(responses)
+				.extracting(JobApplicationResponse::title)
+				.containsExactly("Java Developer");
+		verify(repository, never()).findAllByOrderByCreatedAtDesc();
 	}
 
 	@Test

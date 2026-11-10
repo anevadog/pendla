@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -42,10 +43,11 @@ public class JobApplicationController {
 		return service.create(request);
 	}
 
-	@Operation(summary = "List job applications", description = "Newest first")
+	@Operation(summary = "List job applications",
+			description = "Newest first. Optional filter by status. 400 invalid status")
 	@GetMapping
-	public List<JobApplicationResponse> findAll() {
-		return service.findAll();
+	public List<JobApplicationResponse> findAll(@RequestParam(required = false) ApplicationStatus status) {
+		return service.findAll(status);
 	}
 
 	@Operation(summary = "Get one job application", description = "404 not found")

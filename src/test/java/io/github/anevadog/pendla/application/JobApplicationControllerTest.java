@@ -106,7 +106,7 @@ class JobApplicationControllerTest {
 				"Stockholm", null, ApplicationStatus.SENT, Instant.parse("2026-11-09T12:00:00Z"));
 		var second = new JobApplicationResponse(1L, "31696992", "Java Developer", "Deploja AB",
 				"Stockholm", null, ApplicationStatus.SAVED, Instant.parse("2026-11-09T10:00:00Z"));
-		when(service.findAll()).thenReturn(List.of(first, second));
+		when(service.findAll(null)).thenReturn(List.of(first, second));
 
 		mockMvc.perform(get("/api/applications"))
 				.andExpect(status().isOk())
@@ -117,11 +117,31 @@ class JobApplicationControllerTest {
 
 	@Test
 	void listApplications_withNoApplications_returnsEmptyArray() throws Exception {
-		when(service.findAll()).thenReturn(List.of());
+		when(service.findAll(null)).thenReturn(List.of());
 
 		mockMvc.perform(get("/api/applications"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$").isEmpty());
+	}
+
+	@Test
+	void listApplications_withStatus_passesFilterToService() throws Exception {
+		var sent = new JobApplicationResponse(2L, null, "Backend Developer", "Spotify",
+				"Stockholm", null, ApplicationStatus.SENT, Instant.parse("2026-11-09T12:00:00Z"));
+		when(service.findAll(ApplicationStatus.SENT)).thenReturn(List.of(sent));
+
+		mockMvc.perform(get("/api/applications").param("status", "SENT"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.length()").value(1))
+				.andExpect(jsonPath("$[0].status").value("SENT"));
+	}
+
+	@Test
+	void listApplications_withUnknownStatus_returns400() throws Exception {
+		mockMvc.perform(get("/api/applications").param("status", "FOO"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.status").value(400));
+		verify(service, never()).findAll(any());
 	}
 
 	@Test
