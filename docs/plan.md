@@ -2,8 +2,8 @@
 
 ## Estado actual y siguiente paso
 
-- **Fase actual:** Fase 4 terminada (2026-11-09). **MVP cerrado:** búsqueda real en JobTech y candidaturas con cambio de estado, README y Swagger completos, decisiones documentadas. 67 tests en verde.
-- **Siguiente paso:** elegir de "Ideas para después" qué entra en la Fase 5 y aprobar su diseño antes de escribir código.
+- **Fase actual:** Fase 5 en curso (empezada el 2026-11-10). MVP cerrado en la Fase 4 (2026-11-09).
+- **Siguiente paso:** revisar y commitear F5-1 (`GET /api/applications/{id}`) y seguir con F5-2 (filtro por estado).
 - **Pendiente del autor (fuera de fases):** el ensayo de defensa. Lo hago en papel a mi ritmo y repaso las respuestas al final del proyecto.
 - **Bloqueos:** ninguno.
 
@@ -130,6 +130,20 @@
 - [ ] Ensayo de defensa: explicar cada clase sin mirar el código (aplazado: lo hago en papel y lo repaso al final del proyecto)
 
 **Terminado cuando:** el repositorio se entiende sin explicaciones y puedo defender cada decisión.
+
+### Fase 5 — Huecos de la API de candidaturas y CI
+
+**Objetivo:** dejar la API de candidaturas sin fallos conocidos y ejecutar los tests en cada push.
+
+- [ ] F5-1: `GET /api/applications/{id}` → 200. Id inexistente → 404
+- [ ] F5-2: filtrar el listado por estado: `GET /api/applications?status=SENT`. Valor inválido → 400
+- [ ] F5-3: el 400 por un `status` que no existe indica los valores válidos (en el cuerpo del `PATCH` y en el filtro)
+- [ ] F5-4: dos peticiones a la vez con el mismo `jobtechId` → 409 en lugar de 500
+- [ ] F5-5: GitHub Actions que ejecuta `./mvnw test` en cada push, con badge en el README
+
+**Terminado cuando:** los cuatro cambios funcionan en Swagger, los tests pasan en local y en GitHub Actions, y el README y las decisiones están actualizados.
+
+**Conceptos:** parámetros de consulta opcionales, consultas derivadas con filtro, personalizar errores de deserialización, excepciones de integridad de la base de datos e integración continua.
 
 ## Ideas para después
 
