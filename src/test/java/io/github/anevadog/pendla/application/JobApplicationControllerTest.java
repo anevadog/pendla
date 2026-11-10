@@ -140,7 +140,8 @@ class JobApplicationControllerTest {
 	void listApplications_withUnknownStatus_returns400() throws Exception {
 		mockMvc.perform(get("/api/applications").param("status", "FOO"))
 				.andExpect(status().isBadRequest())
-				.andExpect(jsonPath("$.status").value(400));
+				.andExpect(jsonPath("$.detail").value(
+						"Invalid value 'FOO' for 'status'. Allowed values: SAVED, SENT, INTERVIEW, REJECTED, OFFER"));
 		verify(service, never()).findAll(any());
 	}
 
@@ -220,7 +221,8 @@ class JobApplicationControllerTest {
 						{"status": "FOO"}
 						"""))
 				.andExpect(status().isBadRequest())
-				.andExpect(jsonPath("$.status").value(400));
+				.andExpect(jsonPath("$.detail").value(
+						"Invalid value 'FOO' for 'status'. Allowed values: SAVED, SENT, INTERVIEW, REJECTED, OFFER"));
 		verify(service, never()).changeStatus(any(), any());
 	}
 

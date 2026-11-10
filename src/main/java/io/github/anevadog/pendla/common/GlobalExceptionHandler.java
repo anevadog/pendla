@@ -1,14 +1,18 @@
 package io.github.anevadog.pendla.common;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
+import org.springframework.beans.TypeMismatchException;
 import org.springframework.context.MessageSourceResolvable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
 import org.springframework.validation.method.ParameterValidationResult;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -24,6 +28,7 @@ import io.github.anevadog.pendla.application.JobApplicationNotFoundException;
 import io.github.anevadog.pendla.jobsearch.JobTechTimeoutException;
 import io.github.anevadog.pendla.jobsearch.JobTechUnavailableException;
 import io.github.anevadog.pendla.jobsearch.UnsupportedCityException;
+import tools.jackson.databind.exc.InvalidFormatException;
 
 /**
  * Single place where exceptions become HTTP error responses (ProblemDetail, RFC 9457).
@@ -64,6 +69,45 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 	@ExceptionHandler(JobTechTimeoutException.class)
 	public ProblemDetail handleJobTechTimeout(JobTechTimeoutException ex) {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.GATEWAY_TIMEOUT, ex.getMessage());
+	}
+
+	/**
+	 * The JSON body could not be read. If the cause is an unknown enum value (e.g. "status": "FOO"),
+	 * the answer lists the valid values; any other case keeps Spring's default 400.
+	 */
+	@Override
+	protected ResponseEntity<Object> handleHttpMessageNotReadable(HttpMessageNotReadableException ex,
+			HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+		if (ex.getCause() instanceof InvalidFormatException cause && cause.getTargetType().isEnum()) {
+			// The path says where the bad value was: its last step is the JSON field name
+			String field = cause.getPath().isEmpty() ? "value" : cause.getPath().getLast().getPropertyName();
+			ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST,
+					invalidEnumDetail(field, cause.getValue(), cause.getTargetType()));
+			return handleExceptionInternal(ex, problem, headers, status, request);
+		}
+		return super.handleHttpMessageNotReadable(ex, headers, status, request);
+	}
+
+	/** Same idea for a query parameter or path variable that is an enum (e.g. ?status=FOO). */
+	@Override
+	protected ResponseEntity<Object> handleTypeMismatch(TypeMismatchException ex,
+			HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+		Class<?> requiredType = ex.getRequiredType();
+		if (requiredType != null && requiredType.isEnum()) {
+			ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST,
+					invalidEnumDetail(ex.getPropertyName(), ex.getValue(), requiredType));
+			return handleExceptionInternal(ex, problem, headers, status, request);
+		}
+		return super.handleTypeMismatch(ex, headers, status, request);
+	}
+
+	/** Example: Invalid value 'FOO' for 'status'. Allowed values: SAVED, SENT, INTERVIEW, REJECTED, OFFER */
+	private static String invalidEnumDetail(String name, Object value, Class<?> enumType) {
+		List<String> allowed = new ArrayList<>();
+		for (Object constant : enumType.getEnumConstants()) {
+			allowed.add(constant.toString());
+		}
+		return "Invalid value '" + value + "' for '" + name + "'. Allowed values: " + String.join(", ", allowed);
 	}
 
 	/** Constraints on @RequestParam failed (e.g. blank keyword): 400 with one message per parameter. */

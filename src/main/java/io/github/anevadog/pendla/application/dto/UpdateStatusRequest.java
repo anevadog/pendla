@@ -6,7 +6,8 @@ import jakarta.validation.constraints.NotNull;
 
 /**
  * Body of PATCH /api/applications/{id}/status.
- * A value that is not an ApplicationStatus (e.g. "FOO") fails while reading the JSON and returns 400.
+ * A value that is not an ApplicationStatus (e.g. "FOO") fails while reading the JSON and returns 400
+ * with the list of valid values (see GlobalExceptionHandler).
  */
 public record UpdateStatusRequest(
 
