@@ -2,8 +2,8 @@
 
 ## Estado actual y siguiente paso
 
-- **Fase actual:** Fase 7 en curso (2026-11-10): capturas en el README y licencia MIT hechas. Falta F7-3 en GitHub (topics y fijar el repositorio). Fase 6 terminada el mismo día. MVP cerrado en la Fase 4 (2026-11-09).
-- **Siguiente paso:** terminar F7-3 y cerrar la Fase 7. Después, diseñar la Fase 8. Candidata principal: notas y fecha de entrevista en cada candidatura, con una migración V2.
+- **Fase actual:** Fase 7 terminada (2026-11-10): capturas en el README, licencia MIT, topics en GitHub y repositorio fijado en el perfil. MVP cerrado en la Fase 4 (2026-11-09).
+- **Siguiente paso:** cerrar el diseño de la Fase 8 antes de escribir código. Candidata principal: notas y fecha de entrevista en cada candidatura, con una migración V2.
 - **Bloqueos:** ninguno.
 
 ## Requisitos del MVP
@@ -155,7 +155,7 @@
 
 - [x] F7-1: tres capturas de Swagger en el README (`docs/images/`)
 - [x] F7-2: licencia MIT y la lista "What it demonstrates" actualizada con Flyway
-- [ ] F7-3: en GitHub, topics y repositorio fijado en el perfil
+- [x] F7-3: en GitHub, topics y repositorio fijado en el perfil
 
 **Terminado cuando:** las imágenes se ven en la portada del repositorio en GitHub, la licencia aparece en la barra lateral y el repositorio tiene topics.
 
