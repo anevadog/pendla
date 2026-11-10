@@ -205,7 +205,7 @@ Aquí explico qué elegí en cada momento, qué descarté y por qué.
 
 - **Elegí:** un flujo típico en cuatro pasos con `curl` y su respuesta, la estructura de paquetes, qué prueba cada tipo de test (sin poner el número) y una sección de límites conocidos.
 - **Descarté:** peticiones HTTP en crudo y una captura de Swagger.
-- **Por qué:** los `curl` se pueden copiar y pegar. Una captura se queda vieja en cuanto cambio algo y añade un archivo binario. Contar los límites demuestra que los conozco. Comprobé los JSON de ejemplo contra las respuestas reales, y así vi que Spring 7 ya no incluye `"type": "about:blank"`.
+- **Por qué:** los `curl` se pueden copiar y pegar. Una captura se queda vieja en cuanto cambio algo y añade un archivo binario. (Las capturas las añadí en la Fase 7: ver F7-1.) Contar los límites demuestra que los conozco. Comprobé los JSON de ejemplo contra las respuestas reales, y así vi que Spring 7 ya no incluye `"type": "about:blank"`.
 
 ## Fase 5 — Huecos de la API de candidaturas y CI
 
@@ -253,6 +253,22 @@ Aquí explico qué elegí en cada momento, qué descarté y por qué.
 - **Por qué:** cada cambio del esquema queda en un archivo versionado en git y se aplica una sola vez; Flyway apunta lo que ya ejecutó en la tabla `flyway_schema_history`. Liquibase hace lo mismo con changelogs en XML o YAML y más conceptos, y para una tabla me basta con SQL normal. Con `validate`, si la entidad y la tabla no coinciden, la aplicación no arranca, y prefiero ese fallo pronto a un error en mitad de una petición; `none` no comprobaría nada. Una migración que ya se ejecutó no se edita: cualquier cambio es un archivo nuevo (`V2__...`).
 - **Detalle:** el SQL lo escribí copiando lo que generaba Hibernate y añadí un `CHECK` sobre `status` con los cinco valores del enum. Es una restricción nueva, así que revisé el supuesto de F5-4: al crear, el estado siempre es `SAVED`, por lo que ese `CHECK` no puede fallar en `create` y el `catch` sigue siendo correcto. Si añado un estado al enum, necesito una migración que cambie el `CHECK`.
 - **Límite que conozco:** mis tests no usan base de datos (ver F0-2), así que la migración y la validación solo las compruebo arrancando la aplicación contra PostgreSQL.
+
+## Fase 7 — Presentación del repositorio
+
+### F7-1. Tres capturas de Swagger en el README
+
+- **Elegí:** tres PNG en `docs/images/` (unos 200 KB en total): la lista de endpoints, una búsqueda real en JobTech y un 409 de transición no permitida. Los `curl` del README se quedan.
+- **Descarté:** seguir sin capturas (lo que decidí en F4-3) o un GIF de la demo.
+- **Por qué:** cambio F4-3 porque quien revisa un portafolio mira el README unos segundos, y una imagen enseña antes que un bloque de texto que la API funciona contra datos reales. Para que no se queden viejas tan rápido, solo capturo pantallas estables: la lista de endpoints, la forma de la respuesta y un error. Un GIF pesa varios MB y es más difícil de rehacer.
+- **Cómo las rehago:** con la aplicación arrancada, abro Swagger UI y repito las tres peticiones del README. La candidatura del 409 la creo para la captura y la borro después.
+- **Detalle:** Swagger marca el 409 como "Undocumented" porque los códigos de error están en la descripción y no en `@ApiResponse` (ver F4-1). Lo acepto.
+
+### F7-2. Licencia MIT
+
+- **Elegí:** un archivo `LICENSE` con la licencia MIT.
+- **Descarté:** no poner licencia.
+- **Por qué:** sin licencia, legalmente nadie puede reutilizar el código, y GitHub lo muestra como "No license". MIT es la más corta y la más habitual en proyectos personales.
 
 ## Stack
 

@@ -20,7 +20,7 @@ What it demonstrates:
 - Business rules in the domain: status transitions live in the status enum
 - Consuming an external API with timeouts and controlled errors (`502` / `504`, no retries)
 - Input validation and centralized error handling (`@ControllerAdvice` + `ProblemDetail`)
-- Persistence with Spring Data JPA and PostgreSQL
+- Persistence with Spring Data JPA and PostgreSQL, with a versioned schema (Flyway migrations)
 - Unit and web-layer tests that need no database and no network
 - Continuous integration: GitHub Actions runs the tests on every push
 - API documentation with Swagger (OpenAPI)
@@ -28,6 +28,20 @@ What it demonstrates:
 ## Tech stack
 
 Java 25 · Spring Boot 4.1 · Maven · Spring Data JPA · PostgreSQL · Flyway · Bean Validation · RestClient · springdoc-openapi · JUnit 5 · Mockito · MockMvc · MockRestServiceServer
+
+## Screenshots
+
+All endpoints in Swagger UI:
+
+![Swagger UI with all the endpoints](docs/images/swagger-overview.png)
+
+A real search in JobTech for Java jobs in Göteborg:
+
+![Job search returning real ads from JobTech](docs/images/job-search.png)
+
+A status change that is not allowed (`SENT → SAVED`) returns `409` as `ProblemDetail`:
+
+![PATCH status returning 409 Conflict](docs/images/status-conflict.png)
 
 ## Status
 
@@ -209,3 +223,7 @@ No database and no network needed:
 ## Data source
 
 Job ads come from the [JobTech JobSearch API](https://jobsearch.api.jobtechdev.se/) by Arbetsförmedlingen. Pendla only stores the fields it needs (title, employer, city, link) and never stores contact persons' names, emails or phone numbers.
+
+## License
+
+[MIT](LICENSE)

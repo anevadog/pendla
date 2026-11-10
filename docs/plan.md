@@ -2,8 +2,8 @@
 
 ## Estado actual y siguiente paso
 
-- **Fase actual:** Fase 6 terminada (2026-11-10): el esquema lo gestiona Flyway con la migración V1 y Hibernate solo lo valida. MVP cerrado en la Fase 4 (2026-11-09).
-- **Siguiente paso:** elegir de "Ideas para después" qué entra en la Fase 7 y cerrar su diseño antes de escribir código. Candidata principal: notas y fecha de entrevista en cada candidatura, con una migración V2.
+- **Fase actual:** Fase 7 en curso (2026-11-10): capturas en el README y licencia MIT hechas. Falta F7-3 en GitHub (topics y fijar el repositorio). Fase 6 terminada el mismo día. MVP cerrado en la Fase 4 (2026-11-09).
+- **Siguiente paso:** terminar F7-3 y cerrar la Fase 7. Después, diseñar la Fase 8. Candidata principal: notas y fecha de entrevista en cada candidatura, con una migración V2.
 - **Bloqueos:** ninguno.
 
 ## Requisitos del MVP
@@ -148,6 +148,18 @@
 **Terminado cuando:** la aplicación arranca contra una base de datos vacía, Flyway crea la tabla, Hibernate valida el esquema sin errores y todo funciona en Swagger como antes.
 
 **Conceptos:** migraciones versionadas, la tabla `flyway_schema_history`, `ddl-auto=validate` frente a `update`, y restricciones `CHECK` en SQL.
+
+### Fase 7 — Presentación del repositorio
+
+**Objetivo:** que el repositorio se entienda y se vea bien en GitHub sin tener que arrancarlo.
+
+- [x] F7-1: tres capturas de Swagger en el README (`docs/images/`)
+- [x] F7-2: licencia MIT y la lista "What it demonstrates" actualizada con Flyway
+- [ ] F7-3: en GitHub, topics y repositorio fijado en el perfil
+
+**Terminado cuando:** las imágenes se ven en la portada del repositorio en GitHub, la licencia aparece en la barra lateral y el repositorio tiene topics.
+
+**Conceptos:** licencias de software y cómo presentar un proyecto en un portafolio.
 
 ## Ideas para después
 
