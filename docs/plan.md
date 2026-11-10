@@ -2,8 +2,8 @@
 
 ## Estado actual y siguiente paso
 
-- **Fase actual:** Fase 7 terminada (2026-11-10): capturas en el README, licencia MIT, topics en GitHub y repositorio fijado en el perfil. MVP cerrado en la Fase 4 (2026-11-09).
-- **Siguiente paso:** cerrar el diseño de la Fase 8 antes de escribir código. Candidata principal: notas y fecha de entrevista en cada candidatura, con una migración V2.
+- **Estado:** proyecto terminado y listo para usar (2026-11-10). Fases 0 a 7 cerradas: todos los requisitos del MVP (RF-01 a RF-07, RNF-01 a RNF-03) cumplidos, 78 tests en verde en local y en GitHub Actions, y probado en Swagger contra PostgreSQL y JobTech.
+- **Siguiente paso:** ninguno obligatorio. El proyecto crecerá poco a poco desde "Ideas para después". La primera candidata ya tiene diseño (Fase 8, ver abajo), pero no está implementada.
 - **Bloqueos:** ninguno.
 
 ## Requisitos del MVP
@@ -170,7 +170,8 @@
 - Varios entornos (dev/prod)
 - Paginación en la búsqueda (`offset`)
 - Más ciudades o búsqueda de municipios con la API de taxonomía de JobTech
-- Notas y fecha de entrevista en cada candidatura
+- Notas y fecha de entrevista en cada candidatura (Fase 8, diseñada y sin implementar). Diseño propuesto: migración `V2` con `notes VARCHAR(2000)` e `interview_at TIMESTAMPTZ`; `interviewAt` como `Instant`; `PUT /api/applications/{id}/details`, que reemplaza los dos campos (`null` los borra); avisar en Swagger y en el README de que las notas no deben llevar datos de contacto de terceros, sin filtrarlas con expresiones regulares
+- Documentar los códigos de error con `@ApiResponse` (hoy Swagger marca el 409 como "Undocumented", ver F4-1)
 - Editar los campos de una candidatura
 - Tests de integración contra PostgreSQL real (Testcontainers, requiere Docker)
 - Paginación del listado de candidaturas (`Pageable`)

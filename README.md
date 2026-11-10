@@ -45,7 +45,13 @@ A status change that is not allowed (`SENT → SAVED`) returns `409` as `Problem
 
 ## Status
 
-MVP finished and extended with a few small improvements. Technical decisions and the alternatives I discarded: [docs/decisiones.md](docs/decisiones.md) (Spanish).
+Finished and ready to use: every feature below works end to end against PostgreSQL and the real JobTech API, and the tests run on every push. Technical decisions and the alternatives I discarded: [docs/decisiones.md](docs/decisiones.md) (Spanish).
+
+Planned next, one small step at a time:
+
+- Notes and interview date on each application (with a new Flyway migration)
+- Pagination for the job search and the applications list
+- More cities, using the JobTech taxonomy API
 
 ## How to run
 
