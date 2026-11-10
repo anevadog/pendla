@@ -125,6 +125,35 @@ class JobApplicationControllerTest {
 	}
 
 	@Test
+	void getApplication_withExistingId_returns200() throws Exception {
+		var found = new JobApplicationResponse(1L, "31696992", "Java Developer", "Deploja AB",
+				"Stockholm", null, ApplicationStatus.SENT, Instant.parse("2026-11-09T10:00:00Z"));
+		when(service.findById(1L)).thenReturn(found);
+
+		mockMvc.perform(get("/api/applications/1"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.id").value(1))
+				.andExpect(jsonPath("$.title").value("Java Developer"))
+				.andExpect(jsonPath("$.status").value("SENT"));
+	}
+
+	@Test
+	void getApplication_withUnknownId_returns404() throws Exception {
+		when(service.findById(99L)).thenThrow(new JobApplicationNotFoundException(99L));
+
+		mockMvc.perform(get("/api/applications/99"))
+				.andExpect(status().isNotFound())
+				.andExpect(jsonPath("$.detail").value("Job application 99 not found"));
+	}
+
+	@Test
+	void getApplication_withNonNumericId_returns400() throws Exception {
+		mockMvc.perform(get("/api/applications/abc"))
+				.andExpect(status().isBadRequest());
+		verify(service, never()).findById(any());
+	}
+
+	@Test
 	void changeStatus_validTransition_returns200() throws Exception {
 		var updated = new JobApplicationResponse(1L, null, "Java Developer", "Deploja AB",
 				null, null, ApplicationStatus.SENT, Instant.parse("2026-11-09T10:00:00Z"));

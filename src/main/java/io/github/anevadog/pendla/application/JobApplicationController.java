@@ -48,6 +48,12 @@ public class JobApplicationController {
 		return service.findAll();
 	}
 
+	@Operation(summary = "Get one job application", description = "404 not found")
+	@GetMapping("/{id}")
+	public JobApplicationResponse findById(@PathVariable Long id) {
+		return service.findById(id);
+	}
+
 	@Operation(summary = "Change the status of a job application",
 			description = "Allowed: SAVED→SENT, SENT→INTERVIEW|REJECTED, INTERVIEW→OFFER|REJECTED. "
 					+ "400 invalid status · 404 not found · 409 transition not allowed")

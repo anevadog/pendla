@@ -47,6 +47,13 @@ public class JobApplicationService {
 				.toList();
 	}
 
+	@Transactional(readOnly = true)
+	public JobApplicationResponse findById(Long id) {
+		return repository.findById(id)
+				.map(JobApplicationResponse::from)
+				.orElseThrow(() -> new JobApplicationNotFoundException(id));
+	}
+
 	@Transactional
 	public JobApplicationResponse changeStatus(Long id, UpdateStatusRequest request) {
 		JobApplication application = repository.findById(id)

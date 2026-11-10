@@ -106,6 +106,27 @@ class JobApplicationServiceTest {
 	}
 
 	@Test
+	void findById_withExistingId_returnsResponse() {
+		var application = new JobApplication("31696992", "Java Developer", "Deploja AB", "Stockholm", null);
+		when(repository.findById(1L)).thenReturn(Optional.of(application));
+
+		JobApplicationResponse response = service.findById(1L);
+
+		assertThat(response.jobtechId()).isEqualTo("31696992");
+		assertThat(response.title()).isEqualTo("Java Developer");
+		assertThat(response.status()).isEqualTo(ApplicationStatus.SAVED);
+	}
+
+	@Test
+	void findById_withUnknownId_throwsNotFound() {
+		when(repository.findById(99L)).thenReturn(Optional.empty());
+
+		assertThatThrownBy(() -> service.findById(99L))
+				.isInstanceOf(JobApplicationNotFoundException.class)
+				.hasMessageContaining("99");
+	}
+
+	@Test
 	void changeStatus_validTransition_returnsUpdatedStatus() {
 		var application = new JobApplication(null, "Java Developer", "Deploja AB", null, null);
 		when(repository.findById(1L)).thenReturn(Optional.of(application));
