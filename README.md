@@ -27,7 +27,7 @@ What it demonstrates:
 
 ## Tech stack
 
-Java 25 · Spring Boot 4.1 · Maven · Spring Data JPA · PostgreSQL · Bean Validation · RestClient · springdoc-openapi · JUnit 5 · Mockito · MockMvc · MockRestServiceServer
+Java 25 · Spring Boot 4.1 · Maven · Spring Data JPA · PostgreSQL · Flyway · Bean Validation · RestClient · springdoc-openapi · JUnit 5 · Mockito · MockMvc · MockRestServiceServer
 
 ## Status
 
@@ -50,6 +50,8 @@ Prerequisites: Java 25 and PostgreSQL running locally.
    ```bash
    ./mvnw spring-boot:run
    ```
+
+   On startup, Flyway creates the tables from the SQL migrations in `src/main/resources/db/migration`.
 
 4. Check it is up: `http://localhost:8080/api/ping` returns `pong`.
 5. Open Swagger UI at `http://localhost:8080/swagger-ui.html`. Every endpoint has example values ready for "Try it out".
@@ -201,7 +203,6 @@ No database and no network needed:
 
 - Only four cities are supported (Stockholm, Göteborg, Malmö, Uppsala), mapped to their JobTech municipality ids.
 - Some ads have several workplaces, so a search by city can include an ad whose main address is in another city.
-- The database schema is managed by Hibernate (`ddl-auto=update`), which is fine for this MVP but not for production; versioned migrations (Flyway) would be the next step.
 - Single user, local only: no authentication.
 - Validation messages follow the language of the JVM.
 

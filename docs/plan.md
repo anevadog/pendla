@@ -2,8 +2,8 @@
 
 ## Estado actual y siguiente paso
 
-- **Fase actual:** Fase 5 terminada (2026-11-10): consulta por id, filtro por estado, 400 con los valores válidos, 409 en la carrera del `unique` y tests en GitHub Actions. 77 tests en verde, en local y en CI. MVP cerrado en la Fase 4 (2026-11-09).
-- **Siguiente paso:** elegir de "Ideas para después" qué entra en la Fase 6 y cerrar su diseño antes de escribir código. Candidata principal: Flyway.
+- **Fase actual:** Fase 6 terminada (2026-11-10): el esquema lo gestiona Flyway con la migración V1 y Hibernate solo lo valida. MVP cerrado en la Fase 4 (2026-11-09).
+- **Siguiente paso:** elegir de "Ideas para después" qué entra en la Fase 7 y cerrar su diseño antes de escribir código. Candidata principal: notas y fecha de entrevista en cada candidatura, con una migración V2.
 - **Bloqueos:** ninguno.
 
 ## Requisitos del MVP
@@ -138,6 +138,17 @@
 
 **Conceptos:** parámetros de consulta opcionales, consultas derivadas con filtro, personalizar errores de deserialización, excepciones de integridad de la base de datos e integración continua.
 
+### Fase 6 — Esquema versionado con Flyway
+
+**Objetivo:** que el esquema de la base de datos tenga historial de cambios y no dependa de Hibernate.
+
+- [x] F6-1: Flyway con la migración `V1__create_job_application.sql` y `ddl-auto=validate`
+- [x] F6-2: README, decisiones y plan actualizados
+
+**Terminado cuando:** la aplicación arranca contra una base de datos vacía, Flyway crea la tabla, Hibernate valida el esquema sin errores y todo funciona en Swagger como antes.
+
+**Conceptos:** migraciones versionadas, la tabla `flyway_schema_history`, `ddl-auto=validate` frente a `update`, y restricciones `CHECK` en SQL.
+
 ## Ideas para después
 
 - Transporte público hasta la oferta (Trafiklab)
@@ -145,7 +156,6 @@
 - Frontend
 - Docker y despliegue
 - Varios entornos (dev/prod)
-- Flyway para versionar el esquema de la base de datos
 - Paginación en la búsqueda (`offset`)
 - Más ciudades o búsqueda de municipios con la API de taxonomía de JobTech
 - Notas y fecha de entrevista en cada candidatura

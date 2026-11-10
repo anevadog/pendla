@@ -44,7 +44,7 @@ Aquí explico qué elegí en cada momento, qué descarté y por qué.
 
 - **Elegí:** que Hibernate cree y actualice las tablas a partir de las entidades.
 - **Descarté:** usar Flyway desde el principio.
-- **Por qué:** el MVP funciona sin migraciones versionadas. Sé que `update` no sirve en producción: no deja historial de cambios y nunca borra columnas. Flyway está en "Ideas para después".
+- **Por qué:** el MVP funciona sin migraciones versionadas. Sé que `update` no sirve en producción: no deja historial de cambios y nunca borra columnas. Flyway está en "Ideas para después". (Sustituida en la Fase 6: ver F6-1.)
 
 ## Fase 0 — Esqueleto
 
@@ -207,18 +207,6 @@ Aquí explico qué elegí en cada momento, qué descarté y por qué.
 - **Descarté:** peticiones HTTP en crudo y una captura de Swagger.
 - **Por qué:** los `curl` se pueden copiar y pegar. Una captura se queda vieja en cuanto cambio algo y añade un archivo binario. Contar los límites demuestra que los conozco. Comprobé los JSON de ejemplo contra las respuestas reales, y así vi que Spring 7 ya no incluye `"type": "about:blank"`.
 
-### F4-4. Archivos de trabajo locales fuera del repositorio
-
-- **Elegí:** dejar fuera del repositorio los archivos que solo uso yo para trabajar. Los saqué con `git rm --cached` y los ignoro en `.git/info/exclude`.
-- **Descarté:** mantenerlos en el repositorio público, o reescribir el historial para borrarlos también de los commits antiguos.
-- **Por qué:** no hacen falta para compilar, ejecutar ni entender el proyecto. Reescribir el historial obliga a hacer `git push --force` y cambia todos los commits, y para un portafolio no compensa.
-
-### F4-5. `.git/info/exclude` en lugar de `.gitignore`
-
-- **Elegí:** ignorar esos archivos locales en `.git/info/exclude`.
-- **Descarté:** añadirlos a `.gitignore`.
-- **Por qué:** `.gitignore` se sube al repositorio y en GitHub se verían los nombres de esos archivos. `.git/info/exclude` hace lo mismo pero solo existe en mi equipo.
-
 ## Fase 5 — Huecos de la API de candidaturas y CI
 
 ### F5-1. `GET /api/applications/{id}` reutiliza lo que ya había
@@ -256,11 +244,22 @@ Aquí explico qué elegí en cada momento, qué descarté y por qué.
 - **Por qué:** mis tests no usan base de datos (ver F0-2), así que el workflow no necesita servicios ni secretos. No despliego nada, así que no hay nada que publicar. Es gratis en repositorios públicos.
 - **Lo que añadí al implementar:** `mvnw` estaba en git sin permiso de ejecución, porque trabajo en Windows, y en el runner de Linux habría fallado. Lo arreglé con `git update-index --chmod=+x mvnw` en lugar de un `chmod` en el workflow, para que también funcione al clonar en Linux o Mac.
 
+## Fase 6 — Esquema versionado con Flyway
+
+### F6-1. Flyway con SQL escrito a mano y `ddl-auto=validate`
+
+- **Elegí:** Flyway (`spring-boot-starter-flyway` y `flyway-database-postgresql`) con la migración `V1__create_job_application.sql`, que crea la tabla que antes creaba Hibernate. Hibernate pasa a `ddl-auto=validate`: ya no toca el esquema, solo comprueba al arrancar que coincide con las entidades. Sin baseline, porque la base de datos estaba vacía.
+- **Descarté:** Liquibase, seguir con `ddl-auto=update` y `ddl-auto=none`.
+- **Por qué:** cada cambio del esquema queda en un archivo versionado en git y se aplica una sola vez; Flyway apunta lo que ya ejecutó en la tabla `flyway_schema_history`. Liquibase hace lo mismo con changelogs en XML o YAML y más conceptos, y para una tabla me basta con SQL normal. Con `validate`, si la entidad y la tabla no coinciden, la aplicación no arranca, y prefiero ese fallo pronto a un error en mitad de una petición; `none` no comprobaría nada. Una migración que ya se ejecutó no se edita: cualquier cambio es un archivo nuevo (`V2__...`).
+- **Detalle:** el SQL lo escribí copiando lo que generaba Hibernate y añadí un `CHECK` sobre `status` con los cinco valores del enum. Es una restricción nueva, así que revisé el supuesto de F5-4: al crear, el estado siempre es `SAVED`, por lo que ese `CHECK` no puede fallar en `create` y el `catch` sigue siendo correcto. Si añado un estado al enum, necesito una migración que cambie el `CHECK`.
+- **Límite que conozco:** mis tests no usan base de datos (ver F0-2), así que la migración y la validación solo las compruebo arrancando la aplicación contra PostgreSQL.
+
 ## Stack
 
 | Decisión | Elegí | Descarté | Por qué |
 |---|---|---|---|
 | Versión de Java | Java 25 (LTS) | Java 21 (LTS) | Ya tenía Java 25 instalado y también es LTS. Instalar Java 21 no aportaba nada al MVP |
+| Migraciones | Flyway | Liquibase | SQL normal en archivos versionados, sin XML ni YAML. Ver F6-1 |
 | Build | Maven | Gradle | Es lo más habitual en ofertas junior y su configuración es declarativa (`pom.xml`) |
 | Cliente HTTP | `RestClient` | WebClient, Feign | Viene con Spring y es síncrono y sencillo. WebClient es reactivo y no lo necesito; Feign añade una dependencia para una sola llamada |
 | DTOs | `record` de Java | Clases con Lombok | Son inmutables y no necesitan librerías. Lombok genera código que no se ve en el fuente |
