@@ -2,8 +2,8 @@
 
 ## Estado actual y siguiente paso
 
-- **Fase actual:** Fase 5 en curso (empezada el 2026-11-10). MVP cerrado en la Fase 4 (2026-11-09).
-- **Siguiente paso:** revisar y commitear F5-1 (`GET /api/applications/{id}`) y seguir con F5-2 (filtro por estado).
+- **Fase actual:** Fase 5 terminada (2026-11-10): consulta por id, filtro por estado, 400 con los valores válidos, 409 en la carrera del `unique` y tests en GitHub Actions. 77 tests en verde, en local y en CI. MVP cerrado en la Fase 4 (2026-11-09).
+- **Siguiente paso:** elegir de "Ideas para después" qué entra en la Fase 6 y aprobar su diseño antes de escribir código. Candidata principal: Flyway.
 - **Pendiente del autor (fuera de fases):** el ensayo de defensa. Lo hago en papel a mi ritmo y repaso las respuestas al final del proyecto.
 - **Bloqueos:** ninguno.
 
@@ -135,11 +135,11 @@
 
 **Objetivo:** dejar la API de candidaturas sin fallos conocidos y ejecutar los tests en cada push.
 
-- [ ] F5-1: `GET /api/applications/{id}` → 200. Id inexistente → 404
-- [ ] F5-2: filtrar el listado por estado: `GET /api/applications?status=SENT`. Valor inválido → 400
-- [ ] F5-3: el 400 por un `status` que no existe indica los valores válidos (en el cuerpo del `PATCH` y en el filtro)
-- [ ] F5-4: dos peticiones a la vez con el mismo `jobtechId` → 409 en lugar de 500
-- [ ] F5-5: GitHub Actions que ejecuta `./mvnw test` en cada push, con badge en el README
+- [x] F5-1: `GET /api/applications/{id}` → 200. Id inexistente → 404
+- [x] F5-2: filtrar el listado por estado: `GET /api/applications?status=SENT`. Valor inválido → 400
+- [x] F5-3: el 400 por un `status` que no existe indica los valores válidos (en el cuerpo del `PATCH` y en el filtro)
+- [x] F5-4: dos peticiones a la vez con el mismo `jobtechId` → 409 en lugar de 500
+- [x] F5-5: GitHub Actions que ejecuta `./mvnw test` en cada push, con badge en el README
 
 **Terminado cuando:** los cuatro cambios funcionan en Swagger, los tests pasan en local y en GitHub Actions, y el README y las decisiones están actualizados.
 
@@ -155,18 +155,13 @@
 - Flyway para versionar el esquema de la base de datos
 - Paginación en la búsqueda (`offset`)
 - Más ciudades o búsqueda de municipios con la API de taxonomía de JobTech
-- Filtrar el listado de candidaturas por estado
 - Notas y fecha de entrevista en cada candidatura
 - Editar los campos de una candidatura
-- `GET /api/applications/{id}`
 - Tests de integración contra PostgreSQL real (Testcontainers, requiere Docker)
 - Paginación del listado de candidaturas (`Pageable`)
 - Configurar Mockito como agente en `maven-surefire-plugin` (quita el aviso "self-attaching" de Java 25)
 - Mensajes de validación en un idioma fijo (hoy dependen del idioma de la JVM)
-- Convertir el choque con la restricción `unique` de `jobtech_id` (dos peticiones a la vez) en 409 en lugar de 500
-- Mensaje de 400 que indique los valores válidos cuando `status` no existe en el enum (hoy sale el mensaje genérico de Spring)
 - Bloqueo optimista con `@Version` para dos cambios de estado simultáneos sobre la misma candidatura
 - Historial de cambios de estado con fecha
 - Devolver el total de resultados de JobTech junto a la lista ("105 resultados, se muestran 20")
-- GitHub Actions que ejecute `./mvnw test` en cada push (gratis en repositorios públicos; badge verde en el README)
 - Leer la versión de la API en Swagger desde el `pom.xml` en lugar de escribirla a mano

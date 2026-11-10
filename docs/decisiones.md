@@ -89,7 +89,7 @@ Aquí explico qué elegí en cada momento, qué descarté y por qué. Lo escribo
 
 - **Elegí:** el servicio comprueba `existsByJobtechId` y lanza una excepción que acaba en 409 con un mensaje claro. Además, la columna es `unique` como red de seguridad.
 - **Descarté:** fiarme solo de la restricción y capturar el error de la base de datos.
-- **Por qué:** la regla de negocio se ve en el servicio y el mensaje de error es claro. Límite que conozco: si llegan dos peticiones iguales a la vez, la segunda choca con la restricción y da 500. Con un solo usuario lo acepto.
+- **Por qué:** la regla de negocio se ve en el servicio y el mensaje de error es claro. Límite que conozco: si llegan dos peticiones iguales a la vez, la segunda choca con la restricción y da 500. Con un solo usuario lo acepto. (Resuelto en la Fase 5: ver F5-4.)
 - **Lo que añadí al implementar:** los campos opcionales vacíos (`""` o solo espacios) se guardan como `null`. Así dos candidaturas sin `jobtechId` no chocan con la restricción `unique`.
 
 ### F1-3. Mapeo a mano de entidad a DTO
@@ -153,7 +153,7 @@ Aquí explico qué elegí en cada momento, qué descarté y por qué. Lo escribo
 - **Elegí:** `PATCH` en una subruta, con el cuerpo `{"status": "SENT"}`.
 - **Descarté:** `PUT /api/applications/{id}` con la candidatura completa.
 - **Por qué:** solo cambia un campo. `PUT` significa reemplazar el recurso entero y obligaría a reenviar todos los datos. La subruta deja claro que solo se toca el estado.
-- **Límite que conozco:** si el estado no existe en el enum (`"FOO"`), devuelvo 400 con el mensaje genérico de Spring, que no dice qué valores son válidos. Mejorarlo está en "Ideas para después".
+- **Límite que conozco:** si el estado no existe en el enum (`"FOO"`), devuelvo 400 con el mensaje genérico de Spring, que no dice qué valores son válidos. (Resuelto en la Fase 5: ver F5-3.)
 
 ## Fase 3 — Búsqueda en JobTech
 
@@ -224,6 +224,43 @@ Aquí explico qué elegí en cada momento, qué descarté y por qué. Lo escribo
 - **Elegí:** ignorar esos archivos locales en `.git/info/exclude`.
 - **Descarté:** añadirlos a `.gitignore`.
 - **Por qué:** `.gitignore` se sube al repositorio y en GitHub se verían los nombres de esos archivos. `.git/info/exclude` hace lo mismo pero solo existe en mi equipo.
+
+## Fase 5 — Huecos de la API de candidaturas y CI
+
+### F5-1. `GET /api/applications/{id}` reutiliza lo que ya había
+
+- **Elegí:** un método `findById` en el servicio que devuelve el DTO o lanza `JobApplicationNotFoundException`, la misma excepción que usan el cambio de estado y el borrado.
+- **Descarté:** devolver un `Optional` al controlador y decidir allí entre 200 y 404.
+- **Por qué:** el controlador sigue sin lógica y el 404 sale del mismo sitio que los demás.
+
+### F5-2. Filtro por estado con un parámetro opcional
+
+- **Elegí:** `GET /api/applications?status=SENT`, con `@RequestParam(required = false) ApplicationStatus status`. Si no viene, el servicio recibe `null` y usa la consulta sin filtro. Si viene, usa `findAllByStatusOrderByCreatedAtDesc`.
+- **Descarté:** un endpoint aparte (`/api/applications/by-status/SENT`), o recibir un `Optional<ApplicationStatus>` como parámetro.
+- **Por qué:** filtrar una colección con un parámetro de consulta es lo habitual en REST y no cambia el endpoint que ya existía. `Optional` como parámetro de un método está desaconsejado y complica los tests; un `null` documentado en el Javadoc me basta.
+- **Lo que tengo que saber:** Spring convierte el texto al enum sin código mío y distingue mayúsculas, así que `?status=sent` da 400. Un `?status=` vacío se trata como si no hubiera filtro.
+
+### F5-3. El 400 de un enum inválido dice qué valores valen
+
+- **Elegí:** sobrescribir en `GlobalExceptionHandler` dos métodos más: `handleHttpMessageNotReadable` (el valor viene en el cuerpo JSON) y `handleTypeMismatch` (viene en la URL). Si el tipo esperado es un enum, respondo `Invalid value 'FOO' for 'status'. Allowed values: ...`. En cualquier otro caso llamo a `super` y la respuesta es la de siempre.
+- **Descarté:** cambiar `status` a `String` en `UpdateStatusRequest` y convertirlo a mano en el servicio.
+- **Por qué:** con `String` pierdo el tipo en el DTO y el desplegable de Swagger, y no arreglaba el filtro de F5-2. La solución del manejador sirve para cualquier enum que añada después. El coste: en el cuerpo JSON tengo que mirar la causa de la excepción, que es un `InvalidFormatException` de Jackson (en Jackson 3 el paquete es `tools.jackson`), y sacar el nombre del campo del final de su ruta.
+- **Lo que tengo que saber:** el mensaje repite el valor que mandó el cliente. Va dentro de un JSON, así que no es un riesgo, pero es una decisión consciente.
+
+### F5-4. La carrera del `unique` se convierte en 409 en el servicio
+
+- **Elegí:** en `create`, usar `saveAndFlush` dentro de un `try/catch` de `DataIntegrityViolationException`. Si la candidatura tiene `jobtechId`, lanzo `DuplicateJobApplicationException` (409); si no lo tiene, relanzo la excepción original. Mantengo la comprobación previa con `existsByJobtechId`.
+- **Descarté:** un `@ExceptionHandler` de `DataIntegrityViolationException` en el `@ControllerAdvice`, o bloquear la tabla para que no haya carrera.
+- **Por qué:** el manejador genérico convertiría en "duplicado" cualquier violación de integridad de cualquier tabla. En el servicio sé qué estaba insertando. Uso `saveAndFlush` porque el `INSERT` tiene que ejecutarse dentro del `try`: con `save`, Hibernate puede retrasarlo hasta el commit, que ocurre fuera del método. Mi regla prohíbe el try/catch en los controladores, no en el servicio.
+- **Supuesto:** con `jobtechId`, la única restricción que puede fallar es la `unique`, porque los tamaños y los campos obligatorios ya se validan en el DTO. Si añado otra restricción a la tabla, tengo que revisar este `catch`.
+- **Límite que conozco:** el test simula la excepción con Mockito. La carrera real contra PostgreSQL no está probada; haría falta un test de integración.
+
+### F5-5. GitHub Actions solo para ejecutar los tests
+
+- **Elegí:** un workflow que, en cada push y pull request a `master`, instala Java 25 (Temurin) y ejecuta `./mvnw -B test`, con permisos de solo lectura y caché de dependencias de Maven. El README muestra el badge.
+- **Descarté:** añadir un servicio de PostgreSQL al workflow, o construir y publicar el `jar`.
+- **Por qué:** mis tests no usan base de datos (ver F0-2), así que el workflow no necesita servicios ni secretos. No despliego nada, así que no hay nada que publicar. Es gratis en repositorios públicos.
+- **Lo que añadí al implementar:** `mvnw` estaba en git sin permiso de ejecución, porque trabajo en Windows, y en el runner de Linux habría fallado. Lo arreglé con `git update-index --chmod=+x mvnw` en lugar de un `chmod` en el workflow, para que también funcione al clonar en Linux o Mac.
 
 ## Stack
 

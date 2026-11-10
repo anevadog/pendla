@@ -22,6 +22,7 @@ What it demonstrates:
 - Input validation and centralized error handling (`@ControllerAdvice` + `ProblemDetail`)
 - Persistence with Spring Data JPA and PostgreSQL
 - Unit and web-layer tests that need no database and no network
+- Continuous integration: GitHub Actions runs the tests on every push
 - API documentation with Swagger (OpenAPI)
 
 ## Tech stack
@@ -30,7 +31,7 @@ Java 25 · Spring Boot 4.1 · Maven · Spring Data JPA · PostgreSQL · Bean Val
 
 ## Status
 
-MVP finished. Technical decisions and the alternatives I discarded: [docs/decisiones.md](docs/decisiones.md) (Spanish).
+MVP finished and extended with a few small improvements. Technical decisions and the alternatives I discarded: [docs/decisiones.md](docs/decisiones.md) (Spanish).
 
 ## How to run
 
@@ -131,7 +132,8 @@ curl -X PATCH http://localhost:8080/api/applications/1/status \
 | GET | `/api/ping` | Health check, returns `pong` | — |
 | GET | `/api/jobs?keyword=java&city=Göteborg` | Search job ads in JobTech, max 20. `city` is optional: Stockholm, Göteborg, Malmö or Uppsala (case-insensitive) | `400` invalid keyword or city · `502` JobTech error · `504` JobTech timeout |
 | POST | `/api/applications` | Save a job application (`201`, status `SAVED`) | `400` invalid data · `409` duplicate JobTech ad |
-| GET | `/api/applications` | List applications, newest first | — |
+| GET | `/api/applications` | List applications, newest first. Optional filter: `?status=SENT` | `400` invalid status |
+| GET | `/api/applications/{id}` | Get one application | `404` not found |
 | PATCH | `/api/applications/{id}/status` | Change the status of an application | `400` invalid status · `404` not found · `409` transition not allowed |
 | DELETE | `/api/applications/{id}` | Delete an application (`204`) | `404` not found |
 
@@ -157,6 +159,17 @@ All errors are returned as [`ProblemDetail`](https://www.rfc-editor.org/rfc/rfc9
   "detail": "Invalid request data",
   "instance": "/api/applications",
   "errors": { "title": "must not be blank" }
+}
+```
+
+A status that does not exist (in the `PATCH` body or in the `?status=` filter) returns `400` with the valid values:
+
+```json
+{
+  "title": "Bad Request",
+  "status": 400,
+  "detail": "Invalid value 'FOO' for 'status'. Allowed values: SAVED, SENT, INTERVIEW, REJECTED, OFFER",
+  "instance": "/api/applications"
 }
 ```
 
@@ -189,7 +202,6 @@ No database and no network needed:
 - Only four cities are supported (Stockholm, Göteborg, Malmö, Uppsala), mapped to their JobTech municipality ids.
 - Some ads have several workplaces, so a search by city can include an ad whose main address is in another city.
 - The database schema is managed by Hibernate (`ddl-auto=update`), which is fine for this MVP but not for production; versioned migrations (Flyway) would be the next step.
-- Two identical "save" requests at the same moment hit the database `unique` constraint and return `500` instead of `409`.
 - Single user, local only: no authentication.
 - Validation messages follow the language of the JVM.
 
