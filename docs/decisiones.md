@@ -1,14 +1,8 @@
 # Decisiones técnicas — Pendla
 
-Aquí explico qué elegí en cada momento, qué descarté y por qué. Lo escribo para poder defender el proyecto: si una decisión no la sé explicar con mis palabras, no debería estar en el código.
+Aquí explico qué elegí en cada momento, qué descarté y por qué.
 
-## Etapa 1 — Análisis y propuesta
-
-### D0. Un repositorio Git solo para Pendla
-
-- **Elegí:** crear un repositorio nuevo con `git init` dentro de la carpeta `pendla/`.
-- **Descarté:** usar el repositorio que ya tenía en mi carpeta de usuario.
-- **Por qué:** ese repositorio veía archivos personales y de configuración del sistema, y mezclaba proyectos. Con un repositorio por proyecto no subo nada por error y el historial queda limpio.
+## Decisiones iniciales
 
 ### D1. PostgreSQL desde el primer día
 
@@ -44,7 +38,7 @@ Aquí explico qué elegí en cada momento, qué descarté y por qué. Lo escribo
 
 - **Elegí:** código, endpoints y README en inglés; `docs/` en español.
 - **Descarté:** todo en español.
-- **Por qué:** el README lo van a leer reclutadores en Suecia. El plan y estas decisiones son para mí.
+- **Por qué:** el README lo van a leer reclutadores en Suecia. El plan y estas decisiones son mis notas de trabajo.
 
 ### D7. Tablas creadas por Hibernate (`ddl-auto=update`)
 
@@ -108,7 +102,7 @@ Aquí explico qué elegí en cada momento, qué descarté y por qué. Lo escribo
 
 - **Elegí:** `@URL` de Hibernate Validator.
 - **Descarté:** `@Pattern` con una expresión regular.
-- **Por qué:** se lee mejor y valida el formato de verdad. Tengo que saber dos cosas: que es de Hibernate y no del estándar Jakarta, y que acepta otros protocolos además de `http(s)`.
+- **Por qué:** se lee mejor y valida el formato de verdad. Dos detalles: es de Hibernate y no del estándar Jakarta, y acepta otros protocolos además de `http(s)`.
 
 ### F1-6. `spring.jpa.open-in-view=false`
 
@@ -125,7 +119,7 @@ Aquí explico qué elegí en cada momento, qué descarté y por qué. Lo escribo
 ### F1-8. Un solo manejador de errores que hereda de `ResponseEntityExceptionHandler`
 
 - **Elegí:** `GlobalExceptionHandler` hereda de `ResponseEntityExceptionHandler`. Sobrescribo `handleMethodArgumentNotValid` para devolver los errores por campo de un cuerpo JSON y, desde la Fase 3, también `handleHandlerMethodValidationException` para los errores de los parámetros de la URL (ver F3-5).
-- **Descarté:** activar `spring.mvc.problemdetails.enabled`, que era lo que había aprobado en el diseño, o poner `@Order(Ordered.HIGHEST_PRECEDENCE)` en mi clase.
+- **Descarté:** activar `spring.mvc.problemdetails.enabled`, que era mi primera idea, o poner `@Order(Ordered.HIGHEST_PRECEDENCE)` en mi clase.
 - **Por qué:** al implementar, los tests me demostraron que con esa propiedad Spring Boot registra su propio manejador con `@Order(0)`. Ese manejador atendía la validación antes que el mío y respondía sin los errores por campo. Heredando, Spring Boot ya no registra el suyo. Me queda un solo manejador, que además responde con `ProblemDetail` a los errores propios de Spring MVC, como un JSON mal formado o un id que no es un número.
 
 ## Fase 2 — Cambio de estado
@@ -238,14 +232,14 @@ Aquí explico qué elegí en cada momento, qué descarté y por qué. Lo escribo
 - **Elegí:** `GET /api/applications?status=SENT`, con `@RequestParam(required = false) ApplicationStatus status`. Si no viene, el servicio recibe `null` y usa la consulta sin filtro. Si viene, usa `findAllByStatusOrderByCreatedAtDesc`.
 - **Descarté:** un endpoint aparte (`/api/applications/by-status/SENT`), o recibir un `Optional<ApplicationStatus>` como parámetro.
 - **Por qué:** filtrar una colección con un parámetro de consulta es lo habitual en REST y no cambia el endpoint que ya existía. `Optional` como parámetro de un método está desaconsejado y complica los tests; un `null` documentado en el Javadoc me basta.
-- **Lo que tengo que saber:** Spring convierte el texto al enum sin código mío y distingue mayúsculas, así que `?status=sent` da 400. Un `?status=` vacío se trata como si no hubiera filtro.
+- **Detalle:** Spring convierte el texto al enum sin código mío y distingue mayúsculas, así que `?status=sent` da 400. Un `?status=` vacío se trata como si no hubiera filtro.
 
 ### F5-3. El 400 de un enum inválido dice qué valores valen
 
 - **Elegí:** sobrescribir en `GlobalExceptionHandler` dos métodos más: `handleHttpMessageNotReadable` (el valor viene en el cuerpo JSON) y `handleTypeMismatch` (viene en la URL). Si el tipo esperado es un enum, respondo `Invalid value 'FOO' for 'status'. Allowed values: ...`. En cualquier otro caso llamo a `super` y la respuesta es la de siempre.
 - **Descarté:** cambiar `status` a `String` en `UpdateStatusRequest` y convertirlo a mano en el servicio.
 - **Por qué:** con `String` pierdo el tipo en el DTO y el desplegable de Swagger, y no arreglaba el filtro de F5-2. La solución del manejador sirve para cualquier enum que añada después. El coste: en el cuerpo JSON tengo que mirar la causa de la excepción, que es un `InvalidFormatException` de Jackson (en Jackson 3 el paquete es `tools.jackson`), y sacar el nombre del campo del final de su ruta.
-- **Lo que tengo que saber:** el mensaje repite el valor que mandó el cliente. Va dentro de un JSON, así que no es un riesgo, pero es una decisión consciente.
+- **Detalle:** el mensaje repite el valor que mandó el cliente. Va dentro de un JSON, así que no es un riesgo, pero es una decisión consciente.
 
 ### F5-4. La carrera del `unique` se convierte en 409 en el servicio
 
@@ -269,6 +263,6 @@ Aquí explico qué elegí en cada momento, qué descarté y por qué. Lo escribo
 | Versión de Java | Java 25 (LTS) | Java 21 (LTS) | Ya tenía Java 25 instalado y también es LTS. Instalar Java 21 no aportaba nada al MVP |
 | Build | Maven | Gradle | Es lo más habitual en ofertas junior y su configuración es declarativa (`pom.xml`) |
 | Cliente HTTP | `RestClient` | WebClient, Feign | Viene con Spring y es síncrono y sencillo. WebClient es reactivo y no lo necesito; Feign añade una dependencia para una sola llamada |
-| DTOs | `record` de Java | Clases con Lombok | Son inmutables y no necesitan librerías. Lombok esconde código que tengo que saber explicar |
+| DTOs | `record` de Java | Clases con Lombok | Son inmutables y no necesitan librerías. Lombok genera código que no se ve en el fuente |
 | Simular JobTech en tests | `MockRestServiceServer` | WireMock | Viene con Spring Test y me basta para el MVP |
 | Organización del código | Por funcionalidad (`application/`, `jobsearch/`, `common/`) | Por capas (`controller/`, `service/`…) | Todo lo de una funcionalidad está junto, y la capa se ve en el nombre de cada clase. Por capas, cada funcionalidad quedaría repartida en cinco carpetas |

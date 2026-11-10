@@ -3,8 +3,7 @@
 ## Estado actual y siguiente paso
 
 - **Fase actual:** Fase 5 terminada (2026-11-10): consulta por id, filtro por estado, 400 con los valores válidos, 409 en la carrera del `unique` y tests en GitHub Actions. 77 tests en verde, en local y en CI. MVP cerrado en la Fase 4 (2026-11-09).
-- **Siguiente paso:** elegir de "Ideas para después" qué entra en la Fase 6 y aprobar su diseño antes de escribir código. Candidata principal: Flyway.
-- **Pendiente del autor (fuera de fases):** el ensayo de defensa. Lo hago en papel a mi ritmo y repaso las respuestas al final del proyecto.
+- **Siguiente paso:** elegir de "Ideas para después" qué entra en la Fase 6 y cerrar su diseño antes de escribir código. Candidata principal: Flyway.
 - **Bloqueos:** ninguno.
 
 ## Requisitos del MVP
@@ -22,17 +21,12 @@
 | RNF-02 | Alta | Documentación | Swagger UI accesible en local |
 | RNF-03 | Alta | Tests | Tests de servicio (Mockito), de controlador (MockMvc) y del cliente de JobTech (`MockRestServiceServer`) |
 
-**Supuestos (comprobar en la Fase 0 y la Fase 3):**
+**Supuestos (comprobados en la Fase 0 y la Fase 3):**
 
 - La JobTech JobSearch API es pública, no necesita clave y admite los parámetros `q`, `municipality` y `limit`.
 - Hay un solo usuario y todo funciona en local.
 
 ## Fases
-
-### Etapas previas
-
-- [x] Etapa 1: análisis y propuesta aprobados
-- [x] Etapa 2: documentación mínima revisada por el autor
 
 ### Fase 0 — Esqueleto que responde
 
@@ -122,14 +116,13 @@
 
 ### Fase 4 — Cierre para el portafolio
 
-**Objetivo:** proyecto presentable y defendible.
+**Objetivo:** proyecto presentable.
 
 - [x] README completo, con ejemplos de petición y respuesta
 - [x] Revisar las descripciones de Swagger
-- [x] Repasar `docs/decisiones.md` con mis palabras
-- [ ] Ensayo de defensa: explicar cada clase sin mirar el código (aplazado: lo hago en papel y lo repaso al final del proyecto)
+- [x] Revisar y completar `docs/decisiones.md`
 
-**Terminado cuando:** el repositorio se entiende sin explicaciones y puedo defender cada decisión.
+**Terminado cuando:** el repositorio se entiende sin explicaciones y cada decisión está documentada.
 
 ### Fase 5 — Huecos de la API de candidaturas y CI
 
