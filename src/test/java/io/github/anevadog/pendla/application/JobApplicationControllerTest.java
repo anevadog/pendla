@@ -1,5 +1,6 @@
 package io.github.anevadog.pendla.application;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -10,6 +11,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -17,6 +19,7 @@ import java.time.Instant;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
@@ -24,6 +27,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import io.github.anevadog.pendla.application.dto.JobApplicationResponse;
+import io.github.anevadog.pendla.application.dto.UpdateDetailsRequest;
 
 /**
  * Web layer tests: real controller, validation and GlobalExceptionHandler; the service is a mock.
@@ -40,7 +44,7 @@ class JobApplicationControllerTest {
 	@Test
 	void createApplication_withValidBody_returns201() throws Exception {
 		var saved = new JobApplicationResponse(1L, "31696992", "Java Developer", "Deploja AB",
-				"Stockholm", "https://example.com/ad", ApplicationStatus.SAVED, Instant.parse("2026-11-09T10:00:00Z"));
+				"Stockholm", "https://example.com/ad", ApplicationStatus.SAVED, Instant.parse("2026-11-09T10:00:00Z"), null, null);
 		when(service.create(any())).thenReturn(saved);
 
 		mockMvc.perform(post("/api/applications")
@@ -103,9 +107,9 @@ class JobApplicationControllerTest {
 	@Test
 	void listApplications_returns200WithList() throws Exception {
 		var first = new JobApplicationResponse(2L, null, "Backend Developer", "Spotify",
-				"Stockholm", null, ApplicationStatus.SENT, Instant.parse("2026-11-09T12:00:00Z"));
+				"Stockholm", null, ApplicationStatus.SENT, Instant.parse("2026-11-09T12:00:00Z"), null, null);
 		var second = new JobApplicationResponse(1L, "31696992", "Java Developer", "Deploja AB",
-				"Stockholm", null, ApplicationStatus.SAVED, Instant.parse("2026-11-09T10:00:00Z"));
+				"Stockholm", null, ApplicationStatus.SAVED, Instant.parse("2026-11-09T10:00:00Z"), null, null);
 		when(service.findAll(null)).thenReturn(List.of(first, second));
 
 		mockMvc.perform(get("/api/applications"))
@@ -127,7 +131,7 @@ class JobApplicationControllerTest {
 	@Test
 	void listApplications_withStatus_passesFilterToService() throws Exception {
 		var sent = new JobApplicationResponse(2L, null, "Backend Developer", "Spotify",
-				"Stockholm", null, ApplicationStatus.SENT, Instant.parse("2026-11-09T12:00:00Z"));
+				"Stockholm", null, ApplicationStatus.SENT, Instant.parse("2026-11-09T12:00:00Z"), null, null);
 		when(service.findAll(ApplicationStatus.SENT)).thenReturn(List.of(sent));
 
 		mockMvc.perform(get("/api/applications").param("status", "SENT"))
@@ -148,7 +152,7 @@ class JobApplicationControllerTest {
 	@Test
 	void getApplication_withExistingId_returns200() throws Exception {
 		var found = new JobApplicationResponse(1L, "31696992", "Java Developer", "Deploja AB",
-				"Stockholm", null, ApplicationStatus.SENT, Instant.parse("2026-11-09T10:00:00Z"));
+				"Stockholm", null, ApplicationStatus.SENT, Instant.parse("2026-11-09T10:00:00Z"), null, null);
 		when(service.findById(1L)).thenReturn(found);
 
 		mockMvc.perform(get("/api/applications/1"))
@@ -177,7 +181,7 @@ class JobApplicationControllerTest {
 	@Test
 	void changeStatus_validTransition_returns200() throws Exception {
 		var updated = new JobApplicationResponse(1L, null, "Java Developer", "Deploja AB",
-				null, null, ApplicationStatus.SENT, Instant.parse("2026-11-09T10:00:00Z"));
+				null, null, ApplicationStatus.SENT, Instant.parse("2026-11-09T10:00:00Z"), null, null);
 		when(service.changeStatus(eq(1L), any())).thenReturn(updated);
 
 		mockMvc.perform(patch("/api/applications/1/status")
@@ -238,6 +242,87 @@ class JobApplicationControllerTest {
 						"""))
 				.andExpect(status().isConflict())
 				.andExpect(jsonPath("$.detail").value("Cannot change status from REJECTED to SENT"));
+	}
+
+	@Test
+	void updateDetails_withValidBody_returns200() throws Exception {
+		var updated = new JobApplicationResponse(1L, null, "Java Developer", "Deploja AB",
+				null, null, ApplicationStatus.INTERVIEW, Instant.parse("2026-11-09T10:00:00Z"),
+				"Prepare Spring questions", Instant.parse("2026-11-20T09:00:00Z"));
+		when(service.updateDetails(eq(1L), any())).thenReturn(updated);
+
+		mockMvc.perform(put("/api/applications/1/details")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+						{"notes": "Prepare Spring questions", "interviewAt": "2026-11-20T09:00:00Z"}
+						"""))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.notes").value("Prepare Spring questions"))
+				.andExpect(jsonPath("$.interviewAt").value("2026-11-20T09:00:00Z"));
+	}
+
+	@Test
+	void updateDetails_withOffsetDate_passesUtcInstantToService() throws Exception {
+		var captor = ArgumentCaptor.forClass(UpdateDetailsRequest.class);
+
+		mockMvc.perform(put("/api/applications/1/details")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+						{"interviewAt": "2026-11-20T10:00:00+01:00"}
+						"""))
+				.andExpect(status().isOk());
+
+		verify(service).updateDetails(eq(1L), captor.capture());
+		assertThat(captor.getValue().interviewAt()).isEqualTo(Instant.parse("2026-11-20T09:00:00Z"));
+	}
+
+	@Test
+	void updateDetails_withEmptyBody_passesNullsToService() throws Exception {
+		var captor = ArgumentCaptor.forClass(UpdateDetailsRequest.class);
+
+		mockMvc.perform(put("/api/applications/1/details")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{}"))
+				.andExpect(status().isOk());
+
+		verify(service).updateDetails(eq(1L), captor.capture());
+		assertThat(captor.getValue().notes()).isNull();
+		assertThat(captor.getValue().interviewAt()).isNull();
+	}
+
+	@Test
+	void updateDetails_withNotesOver2000Chars_returns400() throws Exception {
+		String notes = "a".repeat(2001);
+
+		mockMvc.perform(put("/api/applications/1/details")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"notes\": \"" + notes + "\"}"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.errors.notes").exists());
+		verify(service, never()).updateDetails(any(), any());
+	}
+
+	@Test
+	void updateDetails_withInvalidDate_returns400() throws Exception {
+		mockMvc.perform(put("/api/applications/1/details")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+						{"interviewAt": "next friday"}
+						"""))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.status").value(400));
+		verify(service, never()).updateDetails(any(), any());
+	}
+
+	@Test
+	void updateDetails_withUnknownId_returns404() throws Exception {
+		when(service.updateDetails(eq(99L), any())).thenThrow(new JobApplicationNotFoundException(99L));
+
+		mockMvc.perform(put("/api/applications/99/details")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{}"))
+				.andExpect(status().isNotFound())
+				.andExpect(jsonPath("$.detail").value("Job application 99 not found"));
 	}
 
 	@Test

@@ -16,7 +16,9 @@ public record JobApplicationResponse(
 		String city,
 		String url,
 		ApplicationStatus status,
-		Instant createdAt) {
+		Instant createdAt,
+		String notes,
+		Instant interviewAt) {
 
 	public static JobApplicationResponse from(JobApplication application) {
 		return new JobApplicationResponse(
@@ -27,7 +29,9 @@ public record JobApplicationResponse(
 				application.getCity(),
 				application.getUrl(),
 				application.getStatus(),
-				application.getCreatedAt());
+				application.getCreatedAt(),
+				application.getNotes(),
+				application.getInterviewAt());
 	}
 
 }

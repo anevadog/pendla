@@ -47,6 +47,14 @@ public class JobApplication {
 	@Column(name = "created_at", nullable = false, updatable = false)
 	private Instant createdAt;
 
+	// Free text. It must not contain third-party contact data (warned in Swagger and README)
+	@Column(length = 2000)
+	private String notes;
+
+	// Stored in UTC: PostgreSQL TIMESTAMPTZ does not keep the original offset
+	@Column(name = "interview_at")
+	private Instant interviewAt;
+
 	/** Required by JPA. Protected so the rest of the code uses the constructor below. */
 	protected JobApplication() {
 	}
@@ -71,6 +79,15 @@ public class JobApplication {
 			throw new InvalidStatusTransitionException(status, newStatus);
 		}
 		this.status = newStatus;
+	}
+
+	/**
+	 * Replaces both details at once (PUT semantics): a null value clears that field.
+	 * Independent of the status: an interview date can be set before or after moving to INTERVIEW.
+	 */
+	public void updateDetails(String notes, Instant interviewAt) {
+		this.notes = notes;
+		this.interviewAt = interviewAt;
 	}
 
 	public Long getId() {
@@ -103,6 +120,14 @@ public class JobApplication {
 
 	public Instant getCreatedAt() {
 		return createdAt;
+	}
+
+	public String getNotes() {
+		return notes;
+	}
+
+	public Instant getInterviewAt() {
+		return interviewAt;
 	}
 
 }

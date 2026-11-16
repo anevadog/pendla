@@ -8,6 +8,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -20,6 +21,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 
 import io.github.anevadog.pendla.application.dto.CreateJobApplicationRequest;
 import io.github.anevadog.pendla.application.dto.JobApplicationResponse;
+import io.github.anevadog.pendla.application.dto.UpdateDetailsRequest;
 import io.github.anevadog.pendla.application.dto.UpdateStatusRequest;
 
 /**
@@ -191,6 +193,41 @@ class JobApplicationServiceTest {
 		when(repository.findById(99L)).thenReturn(Optional.empty());
 
 		assertThatThrownBy(() -> service.changeStatus(99L, new UpdateStatusRequest(ApplicationStatus.SENT)))
+				.isInstanceOf(JobApplicationNotFoundException.class)
+				.hasMessageContaining("99");
+	}
+
+	@Test
+	void updateDetails_withExistingId_returnsUpdatedResponse() {
+		var application = new JobApplication(null, "Java Developer", "Deploja AB", null, null);
+		when(repository.findById(1L)).thenReturn(Optional.of(application));
+		Instant interviewAt = Instant.parse("2026-11-20T09:00:00Z");
+
+		JobApplicationResponse response = service.updateDetails(1L,
+				new UpdateDetailsRequest(" Prepare Spring questions ", interviewAt));
+
+		assertThat(response.notes()).isEqualTo("Prepare Spring questions");
+		assertThat(response.interviewAt()).isEqualTo(interviewAt);
+		// Dirty checking saves the change: the service must not call save()
+		verify(repository, never()).save(any());
+	}
+
+	@Test
+	void updateDetails_withBlankNotes_storesNull() {
+		var application = new JobApplication(null, "Java Developer", "Deploja AB", null, null);
+		when(repository.findById(1L)).thenReturn(Optional.of(application));
+
+		JobApplicationResponse response = service.updateDetails(1L, new UpdateDetailsRequest("   ", null));
+
+		assertThat(response.notes()).isNull();
+		assertThat(response.interviewAt()).isNull();
+	}
+
+	@Test
+	void updateDetails_withUnknownId_throwsNotFound() {
+		when(repository.findById(99L)).thenReturn(Optional.empty());
+
+		assertThatThrownBy(() -> service.updateDetails(99L, new UpdateDetailsRequest("notes", null)))
 				.isInstanceOf(JobApplicationNotFoundException.class)
 				.hasMessageContaining("99");
 	}
