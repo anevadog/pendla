@@ -6,7 +6,8 @@
 - **Fase 10 cerrada (2026-11-16):** registro, login con JWT y endpoints protegidos. 117 tests en verde (5 necesitan Docker), y probado de punta a punta contra PostgreSQL y JobTech.
 - **Fase 11 cerrada (2026-11-16):** cada candidatura pertenece a un usuario y la de otro usuario responde 404. 122 tests en verde (8 necesitan Docker), y probado de punta a punta con dos usuarios contra PostgreSQL.
 - **Fase 12 cerrada (2026-11-16):** la API está desplegada en https://pendla.onrender.com (Render + Neon, 0 € al mes) con el registro cerrado. 125 tests en verde (8 necesitan Docker), y probado desde fuera contra la URL pública.
-- **Siguiente paso:** ninguno decidido. Pendiente aparte: rehacer las capturas de `docs/images` (son anteriores a las Fases 8, 10, 11 y 12).
+- **Capturas del README rehechas (2026-11-16):** las tres de `docs/images` ya muestran los endpoints de `Auth`, el botón `Authorize` y las peticiones con token.
+- **Siguiente paso:** ninguno decidido.
 - **Bloqueos:** ninguno.
 
 ## Requisitos del MVP
