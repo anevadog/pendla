@@ -1,0 +1,18 @@
+# Files Docker does not send to the build. The image only needs pom.xml, the Maven wrapper and src/.
+
+# Secrets: they must never end up inside an image
+.env
+
+# Build output and version history
+target/
+.git/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Not needed to build
+docs/
+*.md
+compose.yaml
