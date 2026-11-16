@@ -2,8 +2,8 @@
 
 ## Estado actual y siguiente paso
 
-- **Estado:** MVP terminado (2026-11-10) y Fase 8 cerrada (2026-11-16). Fases 0 a 8 cerradas: todos los requisitos del MVP (RF-01 a RF-07, RNF-01 a RNF-03) cumplidos, más las notas y la fecha de entrevista en cada candidatura. 88 tests en verde en local, y probado contra PostgreSQL y JobTech.
-- **Siguiente paso:** Fase 9, Docker Compose para PostgreSQL y tests de integración con Testcontainers. Falta el diseño y su aprobación. Después: usuarios con Spring Security en dos fases (JWT o sesión: **PENDIENTE**) y, por último, el despliegue (consultar costes antes).
+- **Estado:** MVP terminado (2026-11-10) y Fases 8 y 9 cerradas (2026-11-16). Fases 0 a 9 cerradas: todos los requisitos del MVP (RF-01 a RF-07, RNF-01 a RNF-03) cumplidos, más las notas y la fecha de entrevista, PostgreSQL en Docker Compose y un test de repositorio contra PostgreSQL real. 93 tests en verde en local (5 necesitan Docker), y probado contra PostgreSQL y JobTech.
+- **Siguiente paso:** usuarios con Spring Security, en dos fases. Falta el diseño y una decisión: JWT o sesión (**PENDIENTE**). Después, el despliegue (consultar costes antes).
 - **Bloqueos:** ninguno.
 
 ## Requisitos del MVP
@@ -174,19 +174,31 @@
 
 **Conceptos:** segunda migración de Flyway sobre una tabla con datos, `Instant` frente a `OffsetDateTime`, `TIMESTAMPTZ` en PostgreSQL, y `PUT` (reemplazar) frente a `PATCH` (cambiar una parte).
 
+### Fase 9 — Docker Compose y test de integración
+
+**Objetivo:** levantar la base de datos con un comando y comprobar las migraciones y el repositorio contra PostgreSQL real.
+
+- [x] F9-1: `JobApplicationRepositoryTest` con `@DataJpaTest` y Testcontainers (PostgreSQL 18)
+- [x] F9-2: `compose.yaml` con PostgreSQL 18 en el puerto 5433
+- [x] F9-3: README, decisiones y plan actualizados
+
+**Terminado cuando:** los tests pasan con Docker arrancado y también sin `.env`, y la aplicación arranca contra la base de datos de Compose, Flyway crea las tablas y la API responde.
+
+**Conceptos:** contenedores e imágenes, Docker Compose, volúmenes, Testcontainers, `@DataJpaTest`, `@DynamicPropertySource` y la diferencia entre un test unitario y uno de integración.
+
 ## Ideas para después
 
 - Transporte público hasta la oferta (Trafiklab)
 - Login y varios usuarios
 - Frontend
-- Docker y despliegue
+- Despliegue, con la aplicación en un contenedor (`Dockerfile`)
 - Varios entornos (dev/prod)
 - Paginación en la búsqueda (`offset`)
 - Más ciudades o búsqueda de municipios con la API de taxonomía de JobTech
 - Indicar el campo en el 400 de una fecha inválida (`errors.interviewAt`), ver F8-5
 - Documentar los códigos de error con `@ApiResponse` (hoy Swagger marca el 409 como "Undocumented", ver F4-1)
 - Editar los campos de una candidatura
-- Tests de integración contra PostgreSQL real (Testcontainers, requiere Docker)
+- Test de integración de la API completa por HTTP contra PostgreSQL (hoy solo el repositorio, ver F9-1)
 - Paginación del listado de candidaturas (`Pageable`)
 - Configurar Mockito como agente en `maven-surefire-plugin` (quita el aviso "self-attaching" de Java 25)
 - Mensajes de validación en un idioma fijo (hoy dependen del idioma de la JVM)

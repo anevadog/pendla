@@ -310,6 +310,36 @@ Aquí explico qué elegí en cada momento, qué descarté y por qué.
 - **Elegí:** `V2__add_notes_and_interview_at.sql` añade las dos columnas sin `NOT NULL` y sin valor por defecto. `V1` no se toca.
 - **Por qué:** la tabla ya tenía filas, y en ellas los dos campos quedan vacíos, que es justo lo que significan. El límite de 2000 está en dos sitios, `@Size(max = 2000)` en el DTO y `VARCHAR(2000)` en la tabla: el primero da un 400 claro y el segundo es la última barrera.
 
+## Fase 9 — Docker Compose y test de integración
+
+### F9-1. Un solo test con base de datos real, el del repositorio
+
+- **Elegí:** `JobApplicationRepositoryTest`, un `@DataJpaTest` contra un PostgreSQL 18 que Testcontainers arranca en Docker. Al arrancar el contexto, Flyway ejecuta las migraciones y Hibernate valida el esquema; después compruebo que una candidatura se guarda y se lee igual, la restricción `unique` de `jobtechId`, que dos `jobtechId` a `null` no chocan, y las dos consultas derivadas.
+- **Descarté:** un `@SpringBootTest` que recorra la API por HTTP contra la base de datos, y H2 en memoria.
+- **Por qué:** cubre justo lo que ningún otro test cubría (el límite de F6-1): que las migraciones y la entidad coinciden, y que la restricción de F1-2 existe de verdad. El test completo por HTTP repetiría lo que ya prueban los tests de controlador y de servicio, sería más lento y me obligaría a aislar JobTech. H2 no es PostgreSQL: no entiende igual `TIMESTAMPTZ` ni el SQL de mis migraciones, y un test que pasa en H2 no demuestra que funcione en PostgreSQL.
+- **Detalle:** `@DataJpaTest` solo carga la parte de JPA (entidad, repositorio, Flyway) y envuelve cada test en una transacción que se deshace al final, así que los tests no se pisan los datos. Cambia en parte F0-2: sigo sin `contextLoads`, pero ya hay un test que necesita base de datos.
+
+### F9-2. Los datos de conexión con `@DynamicPropertySource`
+
+- **Elegí:** un método `@DynamicPropertySource` que pasa a Spring la URL, el usuario y la contraseña del contenedor, y `@AutoConfigureTestDatabase(replace = NONE)` para que `@DataJpaTest` use esa conexión y no busque una base de datos en memoria.
+- **Descarté:** `@ServiceConnection`.
+- **Por qué:** el contenedor recibe un puerto al azar, así que la URL solo se conoce cuando ya ha arrancado. Con `@DynamicPropertySource` se ve en el propio test qué tres propiedades se sustituyen. `@ServiceConnection` hace lo mismo con una anotación, pero necesita otra dependencia (`spring-boot-testcontainers`) y esconde el mecanismo.
+- **Detalle:** estas propiedades tienen prioridad sobre `application.properties`, así que `${DB_URL}` no llega a leerse y el test funciona sin `.env`. Lo comprobé ejecutando los tests en una copia del proyecto sin `.env`, que es lo que pasa en GitHub Actions.
+
+### F9-3. El test se salta si Docker no está arrancado
+
+- **Elegí:** `@Testcontainers(disabledWithoutDocker = true)`.
+- **Descarté:** que el test falle cuando no hay Docker.
+- **Por qué:** quiero poder ejecutar `./mvnw test` en cualquier momento sin arrancar Docker; los otros 88 tests no lo necesitan. En GitHub Actions el runner ya tiene Docker y el test se ejecuta en cada push.
+- **Límite que conozco:** si Docker fallara en el CI, el test se saltaría sin avisar. Se ve en el resumen de Maven (`Skipped: 5`), pero el build sale en verde.
+
+### F9-4. Docker Compose solo para PostgreSQL
+
+- **Elegí:** un `compose.yaml` con un servicio, PostgreSQL 18, con un volumen para que los datos sobrevivan a `docker compose down`. El usuario y la contraseña salen del mismo `.env` que usa la aplicación. La aplicación sigue arrancando con `./mvnw spring-boot:run`, fuera de Docker.
+- **Descarté:** meter también la aplicación en un contenedor (con un `Dockerfile`), y dejar PostgreSQL instalado como único camino.
+- **Por qué:** quien clona el repositorio levanta la base de datos con un comando, sin instalar PostgreSQL ni crear el usuario a mano. La aplicación en un contenedor no la necesito hasta que haya despliegue, y mientras desarrollo es más cómodo arrancarla desde el IDE.
+- **Detalle:** el puerto publicado es el 5433, porque en mi máquina el 5432 ya lo usa el PostgreSQL instalado, y solo en `127.0.0.1`, para que la base de datos no sea visible desde la red. PostgreSQL instalado sigue siendo una opción válida y está en el README.
+
 ## Stack
 
 | Decisión | Elegí | Descarté | Por qué |
@@ -320,4 +350,5 @@ Aquí explico qué elegí en cada momento, qué descarté y por qué.
 | Cliente HTTP | `RestClient` | WebClient, Feign | Viene con Spring y es síncrono y sencillo. WebClient es reactivo y no lo necesito; Feign añade una dependencia para una sola llamada |
 | DTOs | `record` de Java | Clases con Lombok | Son inmutables y no necesitan librerías. Lombok genera código que no se ve en el fuente |
 | Simular JobTech en tests | `MockRestServiceServer` | WireMock | Viene con Spring Test y me basta para el MVP |
+| Base de datos en el test de repositorio | Testcontainers (PostgreSQL real) | H2 en memoria | H2 no se comporta igual que PostgreSQL. Ver F9-1 |
 | Organización del código | Por funcionalidad (`application/`, `jobsearch/`, `common/`) | Por capas (`controller/`, `service/`…) | Todo lo de una funcionalidad está junto, y la capa se ve en el nombre de cada clase. Por capas, cada funcionalidad quedaría repartida en cinco carpetas |

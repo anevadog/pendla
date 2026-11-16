@@ -21,13 +21,13 @@ What it demonstrates:
 - Consuming an external API with timeouts and controlled errors (`502` / `504`, no retries)
 - Input validation and centralized error handling (`@ControllerAdvice` + `ProblemDetail`)
 - Persistence with Spring Data JPA and PostgreSQL, with a versioned schema (Flyway migrations)
-- Unit and web-layer tests that need no database and no network
+- Unit and web-layer tests that need no database and no network, plus a repository test against a real PostgreSQL (Testcontainers)
 - Continuous integration: GitHub Actions runs the tests on every push
 - API documentation with Swagger (OpenAPI)
 
 ## Tech stack
 
-Java 25 · Spring Boot 4.1 · Maven · Spring Data JPA · PostgreSQL · Flyway · Bean Validation · RestClient · springdoc-openapi · JUnit 5 · Mockito · MockMvc · MockRestServiceServer
+Java 25 · Spring Boot 4.1 · Maven · Spring Data JPA · PostgreSQL · Flyway · Bean Validation · RestClient · springdoc-openapi · JUnit 5 · Mockito · MockMvc · MockRestServiceServer · Testcontainers · Docker Compose
 
 ## Screenshots
 
@@ -49,22 +49,32 @@ Finished and ready to use: every feature below works end to end against PostgreS
 
 Planned next, one small step at a time:
 
-- PostgreSQL in Docker Compose and integration tests with Testcontainers
+- Users and login with Spring Security
 - Pagination for the job search and the applications list
 - More cities, using the JobTech taxonomy API
 
 ## How to run
 
-Prerequisites: Java 25 and PostgreSQL running locally.
+Prerequisites: Java 25, and either Docker or PostgreSQL installed locally.
 
-1. Create the database user and the database (as the `postgres` superuser):
+1. Copy `.env.example` to `.env` and choose a password. The app reads `.env` on startup.
+2. Get a database, in one of two ways:
+
+   **With Docker Compose.** Set the port in `DB_URL` to `5433` in `.env`, then start PostgreSQL 18 (Compose reads the user and the password from the same `.env`):
+
+   ```bash
+   docker compose up -d
+   ```
+
+   `docker compose down` stops it and keeps the data.
+
+   **With PostgreSQL installed locally.** Create the user and the database (as the `postgres` superuser), with the password from `.env`:
 
    ```sql
    CREATE USER pendla WITH PASSWORD 'your-password';
    CREATE DATABASE pendla OWNER pendla;
    ```
 
-2. Copy `.env.example` to `.env` and set the same password. The app reads `.env` on startup.
 3. Start the application (on Windows PowerShell use `.\mvnw.cmd` instead of `./mvnw`):
 
    ```bash
@@ -235,12 +245,16 @@ The code is organized by feature: everything about one feature is in one package
 ./mvnw test
 ```
 
-No database and no network needed:
+Most tests need no database and no network:
 
 - **Domain:** status transitions (all 25 combinations) and the entity's `changeStatus` and `updateDetails`, with plain JUnit.
 - **Services:** business rules with Mockito mocks (duplicates, not found, transitions, city validation, mapping).
 - **Controllers:** `@WebMvcTest` + MockMvc for status codes, validation and `ProblemDetail` responses.
 - **JobTech client:** `MockRestServiceServer` simulates JobTech: success, server error, unreadable body, no connection and timeout.
+
+One test class uses a real database:
+
+- **Repository:** `@DataJpaTest` against PostgreSQL 18 in a container started by Testcontainers. It runs the Flyway migrations, lets Hibernate validate the schema, and checks the unique constraint and the queries. It needs Docker running and is skipped when Docker is not available; it always runs in CI.
 
 ## Known limitations
 
