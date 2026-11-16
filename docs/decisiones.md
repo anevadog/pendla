@@ -340,6 +340,68 @@ Aquí explico qué elegí en cada momento, qué descarté y por qué.
 - **Por qué:** quien clona el repositorio levanta la base de datos con un comando, sin instalar PostgreSQL ni crear el usuario a mano. La aplicación en un contenedor no la necesito hasta que haya despliegue, y mientras desarrollo es más cómodo arrancarla desde el IDE.
 - **Detalle:** el puerto publicado es el 5433, porque en mi máquina el 5432 ya lo usa el PostgreSQL instalado, y solo en `127.0.0.1`, para que la base de datos no sea visible desde la red. PostgreSQL instalado sigue siendo una opción válida y está en el README.
 
+## Fase 10 — Registro y login con JWT
+
+### F10-1. JWT y no sesión
+
+- **Elegí:** autenticación sin estado. El login devuelve un JWT y cada petición lo manda en la cabecera `Authorization: Bearer <token>`. El servidor no guarda nada entre peticiones.
+- **Descarté:** sesión con cookie, que es lo que Spring Security trae casi hecho.
+- **Por qué:** es lo habitual en una API REST que consume otro programa, y se prueba fácil desde Swagger y `curl`. La sesión guarda estado en el servidor y usa cookies, y con cookies hay que protegerse de CSRF.
+- **Coste que acepto:** un token no se puede anular. Si me lo roban, vale hasta que caduca. Por eso caduca en una hora, y no hay logout ni refresh tokens (están en "Ideas para después").
+
+### F10-2. El token lo valida Spring Security, no un filtro mío
+
+- **Elegí:** `spring-boot-starter-security-oauth2-resource-server`. Con `oauth2ResourceServer().jwt()` Spring lee la cabecera, comprueba la firma y la caducidad con mi `JwtDecoder`, y deja al usuario autenticado. Para crear el token uso el `JwtEncoder` de la misma librería.
+- **Descarté:** la librería `jjwt` con un filtro propio (`OncePerRequestFilter`), que es lo que enseñan casi todos los tutoriales.
+- **Por qué:** un filtro de seguridad escrito a mano son unas 80 líneas donde un descuido (tragarse una excepción, no comprobar la caducidad) deja pasar peticiones. Prefiero configurar código que ya está probado. El nombre "OAuth2 resource server" confunde: no uso OAuth2 ni un servidor de autorización externo, solo la parte que valida un JWT. Mi API firma y valida con la misma clave.
+- **Detalle:** firma HS256 (HMAC con SHA-256), que usa una sola clave secreta para firmar y para verificar. Me vale porque la misma aplicación hace las dos cosas. RS256, con clave pública y privada, hace falta cuando valida un servicio distinto del que firma.
+
+### F10-3. El secreto, en `.env` y con longitud mínima
+
+- **Elegí:** `JWT_SECRET` en `.env`, documentado en `.env.example`. Al arrancar, si tiene menos de 32 caracteres, la aplicación falla con un mensaje claro. La caducidad (`jwt.expiration=1h`) no es secreta y va en `application.properties`.
+- **Por qué:** quien conoce el secreto puede fabricar tokens válidos de cualquier usuario, así que no puede estar en el repositorio. HS256 necesita una clave de al menos 256 bits; con una más corta la librería falla más tarde y con un error menos claro.
+- **Detalle:** el token está firmado, no cifrado. Cualquiera puede leer su contenido, así que solo lleva el nombre de usuario y las fechas.
+
+### F10-4. `username` y no email
+
+- **Elegí:** el usuario se identifica con un `username` de 3 a 30 letras, números o guiones bajos, guardado en minúsculas.
+- **Descarté:** el email.
+- **Por qué:** un email es un dato personal y me obligaría a pensar en verificarlo y en protegerlo cuando despliegue. No tengo recuperación de contraseña, que es para lo que serviría. Guardarlo en minúsculas evita que `Alex` y `alex` sean dos cuentas; el login hace la misma conversión.
+
+### F10-5. Contraseñas con BCrypt y el límite de 72 bytes
+
+- **Elegí:** guardar solo el hash BCrypt (`BCryptPasswordEncoder`). La contraseña pide de 8 a 72 caracteres, sin exigir mayúsculas ni símbolos.
+- **Descarté:** SHA-256, y reglas de composición.
+- **Por qué:** BCrypt añade una sal aleatoria a cada contraseña y es lento a propósito, así que dos usuarios con la misma contraseña tienen hashes distintos y probar millones de contraseñas contra una tabla robada sale caro. SHA-256 es rápido, que aquí es un defecto. Las reglas de composición no hacen más fuertes las contraseñas; la longitud sí.
+- **Lo que añadí al implementar:** BCrypt solo admite 72 bytes, y `@Size` cuenta caracteres. Una contraseña de 40 `ñ` pasa la validación pero ocupa 80 bytes, y sin más habría dado un 500. El servicio comprueba los bytes y devuelve 400.
+
+### F10-6. El login no dice si el usuario existe
+
+- **Elegí:** el mismo 401 y el mismo mensaje ("Invalid username or password") para un usuario que no existe y para una contraseña incorrecta. El servicio compara la contraseña con `passwordEncoder.matches` y no uso el `AuthenticationManager` de Spring.
+- **Descarté:** `UserDetailsService` con `AuthenticationManager`.
+- **Por qué:** para un solo tipo de login son dos líneas en mi servicio, y las entiendo. `UserDetailsService` añade tres clases para llegar al mismo sitio.
+- **Límite que conozco:** el registro sí revela si un usuario existe (409), y eso no se puede evitar sin un flujo por email. Además, el login responde más rápido cuando el usuario no existe, porque no calcula el hash.
+
+### F10-7. El 401 de la seguridad sale del mismo manejador de errores
+
+- **Elegí:** un `AuthenticationEntryPoint` de una línea que pasa la excepción al `HandlerExceptionResolver` de Spring MVC. Así llega a `GlobalExceptionHandler`, que devuelve el 401 como `ProblemDetail` con la cabecera `WWW-Authenticate: Bearer`.
+- **Descarté:** escribir el JSON a mano en el `AuthenticationEntryPoint`, o dejar el 401 vacío que da Spring por defecto.
+- **Por qué:** la petición sin token se rechaza en los filtros de seguridad, antes de llegar a ningún controlador, y por eso el `@ControllerAdvice` no se entera por sí solo. De esta forma todos los errores siguen saliendo del mismo sitio y con el mismo formato (D5).
+- **Detalle:** el mensaje es fijo y no explica por qué se rechazó el token (caducado, firma incorrecta), para no dar pistas.
+
+### F10-8. Qué es público y CSRF desactivado
+
+- **Elegí:** públicos `/api/ping`, `/api/auth/**` y Swagger; todo lo demás pide token, incluida la búsqueda en JobTech. CSRF desactivado y sin sesión (`STATELESS`).
+- **Por qué:** la búsqueda llama a una API externa y no quiero que alguien sin cuenta la use a través de la mía. CSRF aprovecha que el navegador manda las cookies solo; aquí no hay cookies y el token lo añade el cliente a mano, así que ese ataque no aplica.
+- **Detalle:** una ruta que no existe también da 401 sin token, y no 404. Lo acepto: así no se puede averiguar qué rutas existen sin estar autenticado.
+- **Límite que conozco:** las candidaturas siguen siendo comunes a todos los usuarios hasta la Fase 11, y el registro está abierto.
+
+### F10-9. Tests de seguridad
+
+- **Elegí:** los tests de controlador importan `SecurityConfig` y, en los endpoints protegidos, usan `@WithMockUser`. Las reglas de acceso se prueban aparte en `SecurityConfigTest` con tokens reales: sin token, válido, caducado, firmado con otra clave y texto que no es un token.
+- **Por qué:** `@WebMvcTest` no carga mis clases `@Configuration`; sin el `@Import` probaría la seguridad por defecto de Spring y no la mía. `@WithMockUser` evita fabricar un token en cada uno de los 30 tests que no tratan de seguridad.
+- **Detalle:** cada test fija `jwt.secret` con `@TestPropertySource`, porque en GitHub Actions no hay `.env`.
+
 ## Stack
 
 | Decisión | Elegí | Descarté | Por qué |
@@ -350,5 +412,6 @@ Aquí explico qué elegí en cada momento, qué descarté y por qué.
 | Cliente HTTP | `RestClient` | WebClient, Feign | Viene con Spring y es síncrono y sencillo. WebClient es reactivo y no lo necesito; Feign añade una dependencia para una sola llamada |
 | DTOs | `record` de Java | Clases con Lombok | Son inmutables y no necesitan librerías. Lombok genera código que no se ve en el fuente |
 | Simular JobTech en tests | `MockRestServiceServer` | WireMock | Viene con Spring Test y me basta para el MVP |
+| Autenticación | JWT validado por Spring Security | Sesión con cookie; `jjwt` con filtro propio | API sin estado y sin código de seguridad escrito a mano. Ver F10-1 y F10-2 |
 | Base de datos en el test de repositorio | Testcontainers (PostgreSQL real) | H2 en memoria | H2 no se comporta igual que PostgreSQL. Ver F9-1 |
 | Organización del código | Por funcionalidad (`application/`, `jobsearch/`, `common/`) | Por capas (`controller/`, `service/`…) | Todo lo de una funcionalidad está junto, y la capa se ve en el nombre de cada clase. Por capas, cada funcionalidad quedaría repartida en cinco carpetas |

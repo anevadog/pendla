@@ -8,6 +8,7 @@ Pendla does two things:
 
 1. **Search real job ads** from the public JobTech API (Arbetsförmedlingen) by keyword and city, and return a simplified version of each ad (title, employer, city, link).
 2. **Track my applications**: save the ads I am interested in, follow their status (`SAVED → SENT → INTERVIEW → REJECTED / OFFER`) and keep notes and the interview date on each one.
+3. **Protect the API**: users register and log in, and every other endpoint needs a JWT.
 
 ## Why I built it
 
@@ -20,6 +21,7 @@ What it demonstrates:
 - Business rules in the domain: status transitions live in the status enum
 - Consuming an external API with timeouts and controlled errors (`502` / `504`, no retries)
 - Input validation and centralized error handling (`@ControllerAdvice` + `ProblemDetail`)
+- Authentication with Spring Security: BCrypt password hashes and stateless JWT tokens
 - Persistence with Spring Data JPA and PostgreSQL, with a versioned schema (Flyway migrations)
 - Unit and web-layer tests that need no database and no network, plus a repository test against a real PostgreSQL (Testcontainers)
 - Continuous integration: GitHub Actions runs the tests on every push
@@ -27,7 +29,7 @@ What it demonstrates:
 
 ## Tech stack
 
-Java 25 · Spring Boot 4.1 · Maven · Spring Data JPA · PostgreSQL · Flyway · Bean Validation · RestClient · springdoc-openapi · JUnit 5 · Mockito · MockMvc · MockRestServiceServer · Testcontainers · Docker Compose
+Java 25 · Spring Boot 4.1 · Maven · Spring Data JPA · PostgreSQL · Flyway · Bean Validation · Spring Security (JWT) · RestClient · springdoc-openapi · JUnit 5 · Mockito · MockMvc · MockRestServiceServer · Testcontainers · Docker Compose
 
 ## Screenshots
 
@@ -49,7 +51,7 @@ Finished and ready to use: every feature below works end to end against PostgreS
 
 Planned next, one small step at a time:
 
-- Users and login with Spring Security
+- Each user sees only their own applications
 - Pagination for the job search and the applications list
 - More cities, using the JobTech taxonomy API
 
@@ -57,7 +59,7 @@ Planned next, one small step at a time:
 
 Prerequisites: Java 25, and either Docker or PostgreSQL installed locally.
 
-1. Copy `.env.example` to `.env` and choose a password. The app reads `.env` on startup.
+1. Copy `.env.example` to `.env`, choose a database password and set `JWT_SECRET` to a random string of at least 32 characters (it signs the login tokens). The app reads `.env` on startup.
 2. Get a database, in one of two ways:
 
    **With Docker Compose.** Set the port in `DB_URL` to `5433` in `.env`, then start PostgreSQL 18 (Compose reads the user and the password from the same `.env`):
@@ -84,16 +86,46 @@ Prerequisites: Java 25, and either Docker or PostgreSQL installed locally.
    On startup, Flyway creates the tables from the SQL migrations in `src/main/resources/db/migration`.
 
 4. Check it is up: `http://localhost:8080/api/ping` returns `pong`.
-5. Open Swagger UI at `http://localhost:8080/swagger-ui.html`. Every endpoint has example values ready for "Try it out".
+5. Open Swagger UI at `http://localhost:8080/swagger-ui.html`. Every endpoint has example values ready for "Try it out". Register and log in under **Auth**, then paste the token in the **Authorize** button to use the other endpoints.
 
 ## Typical flow
 
 The examples use `curl` in a bash shell (Git Bash on Windows). Responses are shortened.
 
-**1. Search job ads** (max 20 results, `city` is optional):
+**1. Create an account and log in:**
 
 ```bash
-curl "http://localhost:8080/api/jobs?keyword=java&city=Stockholm"
+curl -X POST http://localhost:8080/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username": "alex", "password": "correct-horse-battery"}'
+```
+
+```bash
+curl -X POST http://localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "alex", "password": "correct-horse-battery"}'
+```
+
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiJ9...",
+  "expiresAt": "2026-11-16T12:15:53Z"
+}
+```
+
+Every other request needs that token in the `Authorization` header. The examples below read it from a shell variable:
+
+```bash
+TOKEN="eyJhbGciOiJIUzI1NiJ9..."
+```
+
+Without a token, or with one that is invalid or expired, the answer is `401`.
+
+**2. Search job ads** (max 20 results, `city` is optional):
+
+```bash
+curl "http://localhost:8080/api/jobs?keyword=java&city=Stockholm" \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
 ```json
@@ -108,10 +140,11 @@ curl "http://localhost:8080/api/jobs?keyword=java&city=Stockholm"
 ]
 ```
 
-**2. Save the one I am interested in** (it starts as `SAVED`):
+**3. Save the one I am interested in** (it starts as `SAVED`):
 
 ```bash
 curl -X POST http://localhost:8080/api/applications \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"jobtechId": "31696992", "title": "Integrationsutvecklare Java", "employer": "Deploja AB",
        "city": "Stockholm", "url": "https://arbetsformedlingen.se/platsbanken/annonser/31696992"}'
@@ -132,20 +165,22 @@ curl -X POST http://localhost:8080/api/applications \
 }
 ```
 
-**3. Mark it as sent:**
+**4. Mark it as sent:**
 
 ```bash
 curl -X PATCH http://localhost:8080/api/applications/1/status \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"status": "SENT"}'
 ```
 
 The response is the same application with `"status": "SENT"`.
 
-**4. A transition that is not allowed** returns `409`:
+**5. A transition that is not allowed** returns `409`:
 
 ```bash
 curl -X PATCH http://localhost:8080/api/applications/1/status \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"status": "SAVED"}'
 ```
@@ -159,10 +194,11 @@ curl -X PATCH http://localhost:8080/api/applications/1/status \
 }
 ```
 
-**5. Add notes and the interview date:**
+**6. Add notes and the interview date:**
 
 ```bash
 curl -X PUT http://localhost:8080/api/applications/1/details \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"notes": "Technical interview with the backend team. Prepare Spring and SQL questions.",
        "interviewAt": "2026-11-20T10:00:00+01:00"}'
@@ -184,6 +220,8 @@ The response is the same application with the two fields. The date is always ret
 | Method | Path | Description | Errors |
 |---|---|---|---|
 | GET | `/api/ping` | Health check, returns `pong` | — |
+| POST | `/api/auth/register` | Create a user account (`201`). The username is stored in lowercase | `400` invalid data · `409` username already taken |
+| POST | `/api/auth/login` | Log in and get a JWT, valid for one hour | `400` invalid data · `401` wrong username or password |
 | GET | `/api/jobs?keyword=java&city=Göteborg` | Search job ads in JobTech, max 20. `city` is optional: Stockholm, Göteborg, Malmö or Uppsala (case-insensitive) | `400` invalid keyword or city · `502` JobTech error · `504` JobTech timeout |
 | POST | `/api/applications` | Save a job application (`201`, status `SAVED`) | `400` invalid data · `409` duplicate JobTech ad |
 | GET | `/api/applications` | List applications, newest first. Optional filter: `?status=SENT` | `400` invalid status |
@@ -191,6 +229,8 @@ The response is the same application with the two fields. The date is always ret
 | PATCH | `/api/applications/{id}/status` | Change the status of an application | `400` invalid status · `404` not found · `409` transition not allowed |
 | PUT | `/api/applications/{id}/details` | Replace the notes and the interview date (`null` or missing clears the field). Works in any status | `400` notes over 2000 characters or invalid date · `404` not found |
 | DELETE | `/api/applications/{id}` | Delete an application (`204`) | `404` not found |
+
+`/api/ping`, `/api/auth/**` and Swagger are public. Every other endpoint also returns `401` when the request has no token, or the token is invalid or expired.
 
 ### Status transitions
 
@@ -234,7 +274,8 @@ A status that does not exist (in the `PATCH` body or in the `?status=` filter) r
 io.github.anevadog.pendla
 ├── application/   job applications: controller, service, repository, entity, status enum, dto/
 ├── jobsearch/     JobTech search: controller, service, JobTech client and its config, supported cities, dto/
-└── common/        global error handling (ProblemDetail) and Swagger config
+├── user/          accounts: register and login controller, service, token service, entity, dto/
+└── common/        global error handling (ProblemDetail), security rules and Swagger config
 ```
 
 The code is organized by feature: everything about one feature is in one package, and the layer is in each class name.
@@ -250,6 +291,7 @@ Most tests need no database and no network:
 - **Domain:** status transitions (all 25 combinations) and the entity's `changeStatus` and `updateDetails`, with plain JUnit.
 - **Services:** business rules with Mockito mocks (duplicates, not found, transitions, city validation, mapping).
 - **Controllers:** `@WebMvcTest` + MockMvc for status codes, validation and `ProblemDetail` responses.
+- **Security:** the real filter chain with real tokens: no token, expired, signed with another key and not a token at all return `401`.
 - **JobTech client:** `MockRestServiceServer` simulates JobTech: success, server error, unreadable body, no connection and timeout.
 
 One test class uses a real database:
@@ -260,7 +302,8 @@ One test class uses a real database:
 
 - Only four cities are supported (Stockholm, Göteborg, Malmö, Uppsala), mapped to their JobTech municipality ids.
 - Some ads have several workplaces, so a search by city can include an ad whose main address is in another city.
-- Single user, local only: no authentication.
+- Applications are still shared by all users: a logged-in user sees every application.
+- Registration is open, and a token cannot be revoked: it stays valid until it expires (one hour). There are no refresh tokens.
 - Validation messages follow the language of the JVM.
 - An invalid interview date returns a generic `400` (`Failed to read request`) that does not name the field.
 - Notes are not scanned for contact data: keeping them free of it is up to the user.

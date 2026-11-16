@@ -3,8 +3,8 @@
 ## Estado actual y siguiente paso
 
 - **Estado:** MVP terminado (2026-11-10) y Fases 8 y 9 cerradas (2026-11-16). Fases 0 a 9 cerradas: todos los requisitos del MVP (RF-01 a RF-07, RNF-01 a RNF-03) cumplidos, más las notas y la fecha de entrevista, PostgreSQL en Docker Compose y un test de repositorio contra PostgreSQL real. 93 tests en verde en local (5 necesitan Docker), y probado contra PostgreSQL y JobTech.
-- **En curso:** Fase 10, usuarios con JWT. Hecho el registro (F10-1), con 103 tests en verde.
-- **Siguiente paso:** F10-2, login que devuelve el token y endpoints protegidos. Después, la Fase 11 (cada candidatura pertenece a un usuario) y, por último, el despliegue (consultar costes antes).
+- **Fase 10 cerrada (2026-11-16):** registro, login con JWT y endpoints protegidos. 117 tests en verde (5 necesitan Docker), y probado de punta a punta contra PostgreSQL y JobTech.
+- **Siguiente paso:** Fase 11, cada candidatura pertenece a un usuario. Falta el diseño y su aprobación. Después, el despliegue (consultar costes antes).
 - **Bloqueos:** ninguno.
 
 ## Requisitos del MVP
@@ -192,13 +192,13 @@
 **Objetivo:** que la API tenga usuarios y que solo se pueda usar con un token.
 
 - [x] F10-1: `POST /api/auth/register` → 201. Usuario en minúsculas y contraseña guardada como hash BCrypt (migración `V3__create_app_user.sql`). Datos inválidos → 400. Usuario repetido → 409
-- [ ] F10-2: `POST /api/auth/login` → 200 con un JWT (HS256, caduca en 1 hora). Credenciales incorrectas → 401
-- [ ] F10-3: todo protegido salvo `/api/ping`, `/api/auth/**` y Swagger. Sin token o con uno inválido → 401 como `ProblemDetail`. Botón "Authorize" en Swagger
-- [ ] F10-4: README, decisiones y plan actualizados
+- [x] F10-2: `POST /api/auth/login` → 200 con un JWT (HS256, caduca en 1 hora). Credenciales incorrectas → 401
+- [x] F10-3: todo protegido salvo `/api/ping`, `/api/auth/**` y Swagger. Sin token o con uno inválido → 401 como `ProblemDetail`. Botón "Authorize" en Swagger
+- [x] F10-4: README, decisiones y plan actualizados
 
 **Decidido:** JWT y no sesión; validación con el soporte oficial de Spring Security y no con un filtro propio; el usuario se identifica con `username`, no con email.
 
-**PENDIENTE:** qué hacer con el registro abierto cuando haya despliegue.
+**PENDIENTE:** qué hacer con el registro abierto cuando haya despliegue. Las capturas del README (`docs/images/`) son anteriores a las Fases 8 y 10 y hay que rehacerlas.
 
 **Terminado cuando:** un usuario se registra, hace login, y con el token puede usar la API; sin token recibe 401.
 
