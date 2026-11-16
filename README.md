@@ -26,7 +26,7 @@ What it demonstrates:
 - Authentication with Spring Security: BCrypt password hashes and stateless JWT tokens
 - Data ownership: every application belongs to a user (`@ManyToOne`), and every query filters by its owner
 - Persistence with Spring Data JPA and PostgreSQL, with a versioned schema (Flyway migrations)
-- Unit and web-layer tests that need no database and no network, plus a repository test against a real PostgreSQL (Testcontainers)
+- Unit and web-layer tests that need no database and no network, plus a repository test and a full-application integration test against a real PostgreSQL (Testcontainers)
 - Continuous integration: GitHub Actions runs the tests on every push
 - Deployment: a two-stage Dockerfile, deployed to Render with the database on Neon, configured only through environment variables
 - API documentation with Swagger (OpenAPI)
@@ -322,9 +322,10 @@ Most tests need no database and no network:
 - **Security:** the real filter chain with real tokens: no token, expired, signed with another key and not a token at all return `401`.
 - **JobTech client:** `MockRestServiceServer` simulates JobTech: success, server error, unreadable body, no connection and timeout.
 
-One test class uses a real database:
+Two test classes use a real database: PostgreSQL 18 in a container started by Testcontainers. They need Docker running and are skipped when Docker is not available; they always run in CI.
 
-- **Repository:** `@DataJpaTest` against PostgreSQL 18 in a container started by Testcontainers. It runs the Flyway migrations, lets Hibernate validate the schema, and checks the unique constraint per user and that every query returns only the owner's applications. It needs Docker running and is skipped when Docker is not available; it always runs in CI.
+- **Repository:** `@DataJpaTest`. It runs the Flyway migrations, lets Hibernate validate the schema, and checks the unique constraint per user and that every query returns only the owner's applications.
+- **Full application:** `@SpringBootTest` + MockMvc with nothing mocked. Each test registers its users and logs in through the API, so the tokens are real: the full flow (register, log in, create, change status, list, delete), another user's application returns `404`, a repeated `jobtechId`, no token, and the token of a deleted user.
 
 ## Known limitations
 

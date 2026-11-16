@@ -500,6 +500,30 @@ Aquí explico qué elegí en cada momento, qué descarté y por qué.
 - **Cómo queda:** `DB_URL=jdbc:postgresql://<host>/<base>?sslmode=require`, con el usuario y la contraseña en sus propias variables y la conexión directa, sin el pooler de Neon.
 - **Por qué sin el pooler:** Flyway funciona mejor con una conexión directa, y con un solo usuario no necesito agrupar conexiones.
 
+## Fase 13 — Test de integración de la API completa
+
+### F13-1. Un test con la aplicación entera (cambia F9-1)
+
+- **Elegí:** `ApiIntegrationTest`, un `@SpringBootTest` que carga toda la aplicación contra un PostgreSQL 18 de Testcontainers. Cada test registra sus usuarios y hace login por la API, así que los tokens son reales. Cinco casos: el recorrido completo (registro, login, crear, cambiar estado, listar, borrar), la candidatura de otro usuario (404 al leer, cambiar y borrar), el `jobtechId` repetido (409 para el mismo usuario, 201 para otro), sin token (401) y el token de un usuario borrado (401).
+- **Descarté:** seguir como en F9-1, sin test completo.
+- **Por qué cambio F9-1:** allí lo descarté porque repetía lo que ya probaban los tests de controlador y de servicio. Desde las Fases 10 y 11 ya no es así: los tests de controlador usan un usuario falso (`@WithMockUser`) y los de servicio simulan el repositorio, de modo que ningún test comprobaba la cadena entera, del token al `findByIdAndOwner` en la base de datos. Era justo lo que probaba a mano al cerrar la Fase 11.
+- **Lo que sigue sin cubrir:** la búsqueda en JobTech no se llama desde este test, así que no hace falta aislarla (la otra objeción de F9-1). Las validaciones campo a campo se quedan en los tests de controlador.
+- **Coste:** unos 10 segundos más con Docker arrancado. Sin Docker se salta, como el test de repositorio (F9-3).
+
+### F13-2. MockMvc y no un servidor con puerto
+
+- **Elegí:** `@AutoConfigureMockMvc`, la misma herramienta que en los tests de controlador.
+- **Descarté:** `webEnvironment = RANDOM_PORT`, que arranca Tomcat y manda peticiones HTTP de verdad.
+- **Por qué:** lo que faltaba por probar es la unión entre seguridad, servicio y base de datos, y MockMvc ejecuta los filtros de seguridad y todo lo que hay detrás. Tomcat no añade nada que pueda fallar por mi código, y me obligaría a aprender otro cliente.
+- **Límite que conozco:** no hay servidor ni red, así que no es un test "por HTTP". No prueba el puerto, las cabeceras del proxy ni el arranque de Tomcat; eso lo comprobé a mano en el despliegue (F12).
+
+### F13-3. Vaciar las tablas antes de cada test
+
+- **Elegí:** un `@BeforeEach` que borra las candidaturas y después los usuarios con los repositorios.
+- **Descarté:** `@Transactional` en el test, que deshace los cambios al terminar.
+- **Por qué:** con `@Transactional` todo el test sería una sola transacción que nunca hace commit, y en producción cada petición hace el suyo. Así el test se comporta como la aplicación real. El orden importa: primero las candidaturas, por la clave foránea.
+- **Detalle:** el test fija `jwt.secret` y `registration.enabled=true` para no depender de lo que haya en `.env`.
+
 ## Stack
 
 | Decisión | Elegí | Descarté | Por qué |

@@ -7,6 +7,7 @@
 - **Fase 11 cerrada (2026-11-16):** cada candidatura pertenece a un usuario y la de otro usuario responde 404. 122 tests en verde (8 necesitan Docker), y probado de punta a punta con dos usuarios contra PostgreSQL.
 - **Fase 12 cerrada (2026-11-16):** la API está desplegada en https://pendla.onrender.com (Render + Neon, 0 € al mes) con el registro cerrado. 125 tests en verde (8 necesitan Docker), y probado desde fuera contra la URL pública.
 - **Capturas del README rehechas (2026-11-16):** las tres de `docs/images` ya muestran los endpoints de `Auth`, el botón `Authorize` y las peticiones con token.
+- **Fase 13 cerrada (2026-11-16):** un test de integración recorre la API completa (seguridad, servicio y PostgreSQL real) con tokens reales y dos usuarios. 130 tests en verde (13 necesitan Docker).
 - **Siguiente paso:** ninguno decidido.
 - **Bloqueos:** ninguno.
 
@@ -246,6 +247,21 @@
 
 **Conceptos:** imágenes Docker en varias etapas, la memoria de la JVM en un contenedor, variables de entorno como configuración, proxy inverso y cabeceras `X-Forwarded-*`, URL JDBC frente a cadena de conexión libpq, y los límites de un plan gratis (dormirse, arranque en frío).
 
+### Fase 13 — Test de integración de la API completa
+
+**Objetivo:** que un test compruebe lo que hasta ahora probaba a mano: que el usuario del token decide qué candidaturas se ven, con la aplicación entera y PostgreSQL real.
+
+- [x] F13-1: `ApiIntegrationTest` con `@SpringBootTest`, MockMvc y Testcontainers. Cinco casos: recorrido completo, candidatura de otro usuario, `jobtechId` repetido, sin token y token de un usuario borrado
+- [x] F13-2: README, decisiones y plan actualizados
+
+**Decidido:** un test completo además del de repositorio (cambia F9-1); MockMvc y no un servidor con puerto; vaciar las tablas antes de cada test y no `@Transactional`. Ver F13-1 a F13-3 en `docs/decisiones.md`.
+
+**Resuelto:** el PENDIENTE de las capturas de la Fase 12 (rehechas el 2026-11-16).
+
+**Terminado cuando:** `./mvnw test` con Docker arrancado ejecuta los cinco casos en verde, y sin Docker los salta.
+
+**Conceptos:** `@SpringBootTest` frente a `@WebMvcTest` y `@DataJpaTest` (contexto completo o una sola capa), MockMvc con los filtros de seguridad, y por qué un test de integración no usa `@Transactional`.
+
 ## Ideas para después
 
 - Transporte público hasta la oferta (Trafiklab)
@@ -257,7 +273,6 @@
 - Indicar el campo en el 400 de una fecha inválida (`errors.interviewAt`), ver F8-5
 - Documentar los códigos de error con `@ApiResponse` (hoy Swagger marca el 409 como "Undocumented", ver F4-1)
 - Editar los campos de una candidatura
-- Test de integración de la API completa por HTTP contra PostgreSQL (hoy solo el repositorio, ver F9-1)
 - Paginación del listado de candidaturas (`Pageable`)
 - Configurar Mockito como agente en `maven-surefire-plugin` (quita el aviso "self-attaching" de Java 25)
 - Mensajes de validación en un idioma fijo (hoy dependen del idioma de la JVM)
