@@ -4,7 +4,8 @@
 
 - **Estado:** MVP terminado (2026-11-10) y Fases 8 y 9 cerradas (2026-11-16). Fases 0 a 9 cerradas: todos los requisitos del MVP (RF-01 a RF-07, RNF-01 a RNF-03) cumplidos, más las notas y la fecha de entrevista, PostgreSQL en Docker Compose y un test de repositorio contra PostgreSQL real. 93 tests en verde en local (5 necesitan Docker), y probado contra PostgreSQL y JobTech.
 - **Fase 10 cerrada (2026-11-16):** registro, login con JWT y endpoints protegidos. 117 tests en verde (5 necesitan Docker), y probado de punta a punta contra PostgreSQL y JobTech.
-- **Siguiente paso:** Fase 11, cada candidatura pertenece a un usuario. Falta el diseño y su aprobación. Después, el despliegue (consultar costes antes).
+- **Fase 11 cerrada (2026-11-16):** cada candidatura pertenece a un usuario y la de otro usuario responde 404. 122 tests en verde (8 necesitan Docker), y probado de punta a punta con dos usuarios contra PostgreSQL.
+- **Siguiente paso:** despliegue. Falta el diseño y su aprobación; antes hay que consultar costes y decidir qué hacer con el registro abierto.
 - **Bloqueos:** ninguno.
 
 ## Requisitos del MVP
@@ -25,7 +26,7 @@
 **Supuestos (comprobados en la Fase 0 y la Fase 3):**
 
 - La JobTech JobSearch API es pública, no necesita clave y admite los parámetros `q`, `municipality` y `limit`.
-- Hay un solo usuario y todo funciona en local.
+- Hay un solo usuario y todo funciona en local. (Era el supuesto del MVP: desde la Fase 10 hay usuarios, y desde la Fase 11 cada uno tiene sus candidaturas.)
 
 ## Fases
 
@@ -203,6 +204,24 @@
 **Terminado cuando:** un usuario se registra, hace login, y con el token puede usar la API; sin token recibe 401.
 
 **Conceptos:** hash de contraseñas con BCrypt, autenticación sin estado, estructura y firma de un JWT, y la cadena de filtros de Spring Security.
+
+### Fase 11 — Cada candidatura pertenece a un usuario
+
+**Objetivo:** que cada usuario vea y cambie solo sus candidaturas.
+
+- [x] F11-1: migración `V4__add_user_to_job_application.sql`: `user_id` con clave foránea a `app_user`, las filas que ya existían pasan al usuario más antiguo, y el unique de `jobtech_id` pasa a ser por usuario
+- [x] F11-2: crear, listar, ver, cambiar estado, cambiar detalles y borrar usan solo las candidaturas del usuario del token. La de otro usuario → 404, igual que un id que no existe
+- [x] F11-3: dos usuarios pueden guardar la misma oferta; el mismo usuario dos veces → 409
+- [x] F11-4: token válido de un usuario que ya no existe → 401
+- [x] F11-5: README, decisiones y plan actualizados
+
+**Decidido:** 404 y no 403; relación `@ManyToOne` y no una columna `Long`; el username llega al servicio como parámetro desde el controlador. Ver F11-1 a F11-7 en `docs/decisiones.md`.
+
+**PENDIENTE:** qué hacer con el registro abierto cuando haya despliegue. Las capturas del README (`docs/images/`) son anteriores a las Fases 8 y 10 y hay que rehacerlas.
+
+**Terminado cuando:** dos usuarios guardan la misma oferta, cada uno lista solo la suya, y ninguno puede ver, cambiar ni borrar la del otro.
+
+**Conceptos:** relaciones `@ManyToOne`, carga `LAZY` y `EAGER`, clave foránea, unique de varias columnas, migración de una columna obligatoria en tres pasos, y la diferencia entre autenticación (quién eres) y autorización (qué puedes tocar).
 
 ## Ideas para después
 

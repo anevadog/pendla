@@ -4,11 +4,11 @@
 
 A small REST API to track my job search in Sweden.
 
-Pendla does two things:
+Pendla does three things:
 
 1. **Search real job ads** from the public JobTech API (Arbetsförmedlingen) by keyword and city, and return a simplified version of each ad (title, employer, city, link).
 2. **Track my applications**: save the ads I am interested in, follow their status (`SAVED → SENT → INTERVIEW → REJECTED / OFFER`) and keep notes and the interview date on each one.
-3. **Protect the API**: users register and log in, and every other endpoint needs a JWT.
+3. **Protect the API**: users register and log in, every other endpoint needs a JWT, and each user sees only their own applications.
 
 ## Why I built it
 
@@ -22,6 +22,7 @@ What it demonstrates:
 - Consuming an external API with timeouts and controlled errors (`502` / `504`, no retries)
 - Input validation and centralized error handling (`@ControllerAdvice` + `ProblemDetail`)
 - Authentication with Spring Security: BCrypt password hashes and stateless JWT tokens
+- Data ownership: every application belongs to a user (`@ManyToOne`), and every query filters by its owner
 - Persistence with Spring Data JPA and PostgreSQL, with a versioned schema (Flyway migrations)
 - Unit and web-layer tests that need no database and no network, plus a repository test against a real PostgreSQL (Testcontainers)
 - Continuous integration: GitHub Actions runs the tests on every push
@@ -51,7 +52,6 @@ Finished and ready to use: every feature below works end to end against PostgreS
 
 Planned next, one small step at a time:
 
-- Each user sees only their own applications
 - Pagination for the job search and the applications list
 - More cities, using the JobTech taxonomy API
 
@@ -223,14 +223,16 @@ The response is the same application with the two fields. The date is always ret
 | POST | `/api/auth/register` | Create a user account (`201`). The username is stored in lowercase | `400` invalid data · `409` username already taken |
 | POST | `/api/auth/login` | Log in and get a JWT, valid for one hour | `400` invalid data · `401` wrong username or password |
 | GET | `/api/jobs?keyword=java&city=Göteborg` | Search job ads in JobTech, max 20. `city` is optional: Stockholm, Göteborg, Malmö or Uppsala (case-insensitive) | `400` invalid keyword or city · `502` JobTech error · `504` JobTech timeout |
-| POST | `/api/applications` | Save a job application (`201`, status `SAVED`) | `400` invalid data · `409` duplicate JobTech ad |
-| GET | `/api/applications` | List applications, newest first. Optional filter: `?status=SENT` | `400` invalid status |
+| POST | `/api/applications` | Save a job application (`201`, status `SAVED`) | `400` invalid data · `409` you already saved this JobTech ad |
+| GET | `/api/applications` | List your applications, newest first. Optional filter: `?status=SENT` | `400` invalid status |
 | GET | `/api/applications/{id}` | Get one application | `404` not found |
 | PATCH | `/api/applications/{id}/status` | Change the status of an application | `400` invalid status · `404` not found · `409` transition not allowed |
 | PUT | `/api/applications/{id}/details` | Replace the notes and the interview date (`null` or missing clears the field). Works in any status | `400` notes over 2000 characters or invalid date · `404` not found |
 | DELETE | `/api/applications/{id}` | Delete an application (`204`) | `404` not found |
 
 `/api/ping`, `/api/auth/**` and Swagger are public. Every other endpoint also returns `401` when the request has no token, or the token is invalid or expired.
+
+Applications belong to the user who saved them. An application of another user returns the same `404` as one that does not exist, so nobody can find out which ids are in use. Two users can save the same JobTech ad.
 
 ### Status transitions
 
@@ -289,20 +291,19 @@ The code is organized by feature: everything about one feature is in one package
 Most tests need no database and no network:
 
 - **Domain:** status transitions (all 25 combinations) and the entity's `changeStatus` and `updateDetails`, with plain JUnit.
-- **Services:** business rules with Mockito mocks (duplicates, not found, transitions, city validation, mapping).
+- **Services:** business rules with Mockito mocks (duplicates, not found, another user's application, transitions, city validation, mapping).
 - **Controllers:** `@WebMvcTest` + MockMvc for status codes, validation and `ProblemDetail` responses.
 - **Security:** the real filter chain with real tokens: no token, expired, signed with another key and not a token at all return `401`.
 - **JobTech client:** `MockRestServiceServer` simulates JobTech: success, server error, unreadable body, no connection and timeout.
 
 One test class uses a real database:
 
-- **Repository:** `@DataJpaTest` against PostgreSQL 18 in a container started by Testcontainers. It runs the Flyway migrations, lets Hibernate validate the schema, and checks the unique constraint and the queries. It needs Docker running and is skipped when Docker is not available; it always runs in CI.
+- **Repository:** `@DataJpaTest` against PostgreSQL 18 in a container started by Testcontainers. It runs the Flyway migrations, lets Hibernate validate the schema, and checks the unique constraint per user and that every query returns only the owner's applications. It needs Docker running and is skipped when Docker is not available; it always runs in CI.
 
 ## Known limitations
 
 - Only four cities are supported (Stockholm, Göteborg, Malmö, Uppsala), mapped to their JobTech municipality ids.
 - Some ads have several workplaces, so a search by city can include an ad whose main address is in another city.
-- Applications are still shared by all users: a logged-in user sees every application.
 - Registration is open, and a token cannot be revoked: it stays valid until it expires (one hour). There are no refresh tokens.
 - Validation messages follow the language of the JVM.
 - An invalid interview date returns a generic `400` (`Failed to read request`) that does not name the field.

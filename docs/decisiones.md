@@ -402,6 +402,55 @@ Aquí explico qué elegí en cada momento, qué descarté y por qué.
 - **Por qué:** `@WebMvcTest` no carga mis clases `@Configuration`; sin el `@Import` probaría la seguridad por defecto de Spring y no la mía. `@WithMockUser` evita fabricar un token en cada uno de los 30 tests que no tratan de seguridad.
 - **Detalle:** cada test fija `jwt.secret` con `@TestPropertySource`, porque en GitHub Actions no hay `.env`.
 
+## Fase 11 — Cada candidatura pertenece a un usuario
+
+### F11-1. La candidatura de otro usuario da 404, no 403
+
+- **Elegí:** si pido, cambio o borro una candidatura que es de otro usuario, la respuesta es el mismo 404 y el mismo mensaje que para un id que no existe.
+- **Descarté:** 403 Forbidden.
+- **Por qué:** un 403 confirma que ese id existe. Los ids son consecutivos, así que cualquiera con cuenta podría recorrerlos y saber cuántas candidaturas hay en total. Además el código sale más simple: una sola consulta por id y dueño (`findByIdAndOwner`) que, si no encuentra nada, lanza la `JobApplicationNotFoundException` de siempre. No hay excepción nueva ni un caso nuevo en el `@ControllerAdvice`.
+- **Detalle:** la comprobación está en un único método privado del servicio (`findOwnApplication`), que usan ver, cambiar estado, cambiar detalles y borrar.
+
+### F11-2. El usuario llega al servicio como parámetro
+
+- **Elegí:** cada método del controlador recibe `Authentication` (Spring lo rellena con el usuario del token) y pasa `authentication.getName()`, el username, al servicio. Todos los métodos del servicio tienen un parámetro `String username`.
+- **Descarté:** leer `SecurityContextHolder` dentro del servicio, y `@AuthenticationPrincipal Jwt` en el controlador.
+- **Por qué:** con el parámetro se ve en la firma que el método depende del usuario, y el test unitario del servicio solo tiene que pasar un `String`. `SecurityContextHolder` es una dependencia oculta. `@AuthenticationPrincipal Jwt` no funciona con `@WithMockUser`, y habría tenido que fabricar un token en cada test de controlador.
+- **Coste que acepto:** el servicio busca al usuario por su username en cada petición, una consulta más sobre un índice único. La alternativa era meter el id del usuario en el token; ahorra la consulta, pero obliga a leer el `Jwt` en el controlador.
+
+### F11-3. Relación `@ManyToOne` con carga `LAZY`
+
+- **Elegí:** la entidad `JobApplication` tiene un campo `owner` de tipo `AppUser` con `@ManyToOne(fetch = FetchType.LAZY)` y `@JoinColumn(name = "user_id")`.
+- **Descarté:** una columna simple `Long userId`.
+- **Por qué:** en la base de datos hay una clave foránea, y `@ManyToOne` es la forma normal de decirlo en JPA. Las consultas del repositorio quedan con nombres que se leen solos (`findAllByOwnerOrderByCreatedAtDesc`). `LAZY` porque nunca necesito los datos del dueño al leer una candidatura; por defecto `@ManyToOne` es `EAGER` y traería al usuario en cada consulta.
+- **Detalle:** el campo se llama `owner` y no `user`, que se lee mejor en los nombres de las consultas. `updatable = false`: una candidatura no cambia de dueño. La relación es de un solo sentido: `AppUser` no tiene una lista de candidaturas, porque no la uso. El paquete `application` pasa a depender de `user`; al revés no.
+
+### F11-4. Migración V4: las candidaturas que ya existían
+
+- **Elegí:** `V4__add_user_to_job_application.sql` añade `user_id` sin `NOT NULL`, asigna las filas que ya existían al usuario más antiguo (`SELECT MIN(id) FROM app_user`) y después pone el `NOT NULL`.
+- **Descarté:** borrar las filas existentes, y dejar `user_id` nullable.
+- **Por qué:** borrar perdía mis candidaturas reales. Con la columna nullable, la regla "toda candidatura tiene dueño" no la garantiza la base de datos, y las filas sin dueño quedarían invisibles para siempre.
+- **Coste que acepto:** si hay candidaturas y ningún usuario, la migración falla y la aplicación no arranca. No se pierde nada: PostgreSQL ejecuta la migración en una transacción y Flyway la deshace entera. Solo le puede pasar a una base de datos anterior a esta fase; en una base vacía no hay filas que asignar. Probé los dos casos a mano contra la base de datos de Compose.
+
+### F11-5. El unique de `jobtech_id` pasa a ser por usuario
+
+- **Elegí:** V4 quita el `UNIQUE (jobtech_id)` de V1 y crea `UNIQUE (user_id, jobtech_id)`. El servicio comprueba el duplicado con `existsByOwnerAndJobtechId` y el 409 no cambia (F1-2).
+- **Por qué:** dos usuarios pueden guardar la misma oferta, pero cada uno solo una vez.
+- **Detalle:** el índice que crea ese unique empieza por `user_id`, así que también sirve para listar las candidaturas de un usuario y no hace falta otro. Para quitar el unique antiguo hay que saber su nombre: V1 no se lo puso, y PostgreSQL lo llamó `job_application_jobtech_id_key`. Hibernate solo valida tablas, columnas y tipos (`ddl-auto=validate`), no los unique, así que quien lo comprueba es el test de repositorio.
+
+### F11-6. Token válido de un usuario que ya no existe
+
+- **Elegí:** 401. El servicio lanza `UsernameNotFoundException`, de Spring Security, cuando no encuentra al usuario del token.
+- **Descarté:** una excepción propia, o un 404.
+- **Por qué:** el token está bien firmado y no ha caducado, pero ya no identifica a nadie, y eso es un problema de autenticación. `UsernameNotFoundException` es una `AuthenticationException`, que `GlobalExceptionHandler` ya convertía en el 401 con `WWW-Authenticate: Bearer` (F10-7): no hizo falta tocarlo.
+- **Detalle:** hoy no hay forma de borrar un usuario desde la API. Puede pasar si se borra en la base de datos, o si se vacía la base de datos y se mantiene el mismo `JWT_SECRET`.
+
+### F11-7. Tests del aislamiento entre usuarios
+
+- **Elegí:** tres niveles. En el servicio, los mocks solo responden cuando se les pregunta por el usuario correcto, y se verifica que nunca se llama a las consultas sin dueño (`findById`, `deleteById`, `findAll`). En el repositorio, contra PostgreSQL real, dos usuarios guardan la misma oferta y cada consulta devuelve solo lo del suyo. En el controlador, `@WithMockUser(username = "alex")` y se comprueba que el servicio recibe `"alex"`; `SecurityConfigTest` comprueba lo mismo con un token real.
+- **Por qué:** el fallo grave de esta fase sería usar por descuido una consulta de `JpaRepository` que no filtra por dueño. Un mock no demuestra que la consulta SQL filtra bien, y por eso esa parte está en el test con base de datos real.
+- **Límite que conozco:** no hay un test automático de la API completa con dos tokens contra PostgreSQL; eso lo probé a mano. Tampoco hay test de la migración con filas ya existentes. El test de integración por HTTP sigue en "Ideas para después".
+
 ## Stack
 
 | Decisión | Elegí | Descarté | Por qué |
