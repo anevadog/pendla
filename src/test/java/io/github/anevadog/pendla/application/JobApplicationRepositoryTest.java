@@ -23,7 +23,7 @@ import io.github.anevadog.pendla.user.AppUserRepository;
 import jakarta.persistence.EntityManager;
 
 /**
- * The only test that uses a real database: PostgreSQL in a Docker container (Testcontainers).
+ * Repository test against a real database: PostgreSQL in a Docker container (Testcontainers).
  * When the context starts, Flyway runs the migrations and Hibernate validates the schema,
  * so a migration that does not match the entity makes every test here fail.
  *
