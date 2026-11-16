@@ -8,7 +8,7 @@
 - **Fase 12 cerrada (2026-11-16):** la API está desplegada en https://pendla.onrender.com (Render + Neon, 0 € al mes) con el registro cerrado. 125 tests en verde (8 necesitan Docker), y probado desde fuera contra la URL pública.
 - **Capturas del README rehechas (2026-11-16):** las tres de `docs/images` ya muestran los endpoints de `Auth`, el botón `Authorize` y las peticiones con token.
 - **Fase 13 cerrada (2026-11-16):** un test de integración recorre la API completa (seguridad, servicio y PostgreSQL real) con tokens reales y dos usuarios. 130 tests en verde (13 necesitan Docker).
-- **Siguiente paso:** ninguno decidido.
+- **Proyecto terminado (2026-11-16).** No hay más fases previstas; lo que queda fuera está en "Ideas para después".
 - **Bloqueos:** ninguno.
 
 ## Requisitos del MVP
