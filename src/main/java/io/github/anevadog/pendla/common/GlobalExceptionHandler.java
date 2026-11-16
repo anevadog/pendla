@@ -31,6 +31,7 @@ import io.github.anevadog.pendla.jobsearch.JobTechUnavailableException;
 import io.github.anevadog.pendla.jobsearch.UnsupportedCityException;
 import io.github.anevadog.pendla.user.InvalidCredentialsException;
 import io.github.anevadog.pendla.user.PasswordTooLongException;
+import io.github.anevadog.pendla.user.RegistrationDisabledException;
 import io.github.anevadog.pendla.user.UsernameAlreadyExistsException;
 import tools.jackson.databind.exc.InvalidFormatException;
 
@@ -73,6 +74,12 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 	@ExceptionHandler(JobTechTimeoutException.class)
 	public ProblemDetail handleJobTechTimeout(JobTechTimeoutException ex) {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.GATEWAY_TIMEOUT, ex.getMessage());
+	}
+
+	/** Registration is switched off in the configuration of this server. */
+	@ExceptionHandler(RegistrationDisabledException.class)
+	public ProblemDetail handleRegistrationDisabled(RegistrationDisabledException ex) {
+		return ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
 	}
 
 	@ExceptionHandler(UsernameAlreadyExistsException.class)

@@ -3,6 +3,7 @@ package io.github.anevadog.pendla.user;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -26,10 +27,15 @@ public class AuthService {
 	private final PasswordEncoder passwordEncoder;
 	private final TokenService tokenService;
 
-	public AuthService(AppUserRepository repository, PasswordEncoder passwordEncoder, TokenService tokenService) {
+	// Switch from the configuration: true on my machine, false on the public server once my user exists
+	private final boolean registrationEnabled;
+
+	public AuthService(AppUserRepository repository, PasswordEncoder passwordEncoder, TokenService tokenService,
+			@Value("${registration.enabled}") boolean registrationEnabled) {
 		this.repository = repository;
 		this.passwordEncoder = passwordEncoder;
 		this.tokenService = tokenService;
+		this.registrationEnabled = registrationEnabled;
 	}
 
 	/**
@@ -54,6 +60,11 @@ public class AuthService {
 
 	@Transactional
 	public UserResponse register(RegisterRequest request) {
+		// First check: when registration is closed, nothing else about the request matters
+		if (!registrationEnabled) {
+			throw new RegistrationDisabledException();
+		}
+
 		// Locale.ROOT: the result does not depend on the language of the machine
 		String username = request.username().toLowerCase(Locale.ROOT);
 

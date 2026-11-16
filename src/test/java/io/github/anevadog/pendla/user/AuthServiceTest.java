@@ -6,15 +6,16 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.time.Instant;
 import java.util.Optional;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -40,8 +41,13 @@ class AuthServiceTest {
 	@Mock
 	private TokenService tokenService;
 
-	@InjectMocks
 	private AuthService service;
+
+	// Built by hand: Mockito cannot inject the boolean. Registration is open unless a test says otherwise
+	@BeforeEach
+	void createService() {
+		service = new AuthService(repository, passwordEncoder, tokenService, true);
+	}
 
 	@Test
 	void login_withValidCredentials_returnsTokenForLowercaseUsername() {
@@ -125,6 +131,27 @@ class AuthServiceTest {
 				.isInstanceOf(PasswordTooLongException.class);
 		verify(passwordEncoder, never()).encode(anyString());
 		verify(repository, never()).saveAndFlush(any());
+	}
+
+	@Test
+	void register_whenRegistrationIsDisabled_throwsRegistrationDisabledAndSavesNothing() {
+		var closedService = new AuthService(repository, passwordEncoder, tokenService, false);
+
+		assertThatThrownBy(() -> closedService.register(new RegisterRequest("alex", "secret-password")))
+				.isInstanceOf(RegistrationDisabledException.class);
+		// Not even a query: the answer does not depend on whether the username exists
+		verifyNoInteractions(repository, passwordEncoder);
+	}
+
+	@Test
+	void login_whenRegistrationIsDisabled_stillWorks() {
+		var closedService = new AuthService(repository, passwordEncoder, tokenService, false);
+		var token = new TokenResponse("header.payload.signature", Instant.parse("2026-11-16T11:00:00Z"));
+		when(repository.findByUsername("alex")).thenReturn(Optional.of(new AppUser("alex", "hashed-password")));
+		when(passwordEncoder.matches("secret-password", "hashed-password")).thenReturn(true);
+		when(tokenService.createToken("alex")).thenReturn(token);
+
+		assertThat(closedService.login(new LoginRequest("alex", "secret-password"))).isEqualTo(token);
 	}
 
 }

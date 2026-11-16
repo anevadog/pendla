@@ -33,7 +33,8 @@ public class AuthController {
 	}
 
 	@Operation(summary = "Create a user account",
-			description = "The username is stored in lowercase. 400 invalid data · 409 username already taken")
+			description = "The username is stored in lowercase. "
+					+ "400 invalid data · 403 registration is closed on this server · 409 username already taken")
 	@PostMapping("/register")
 	@ResponseStatus(HttpStatus.CREATED)
 	public UserResponse register(@Valid @RequestBody RegisterRequest request) {

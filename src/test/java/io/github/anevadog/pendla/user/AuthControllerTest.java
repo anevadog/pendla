@@ -89,6 +89,20 @@ class AuthControllerTest {
 	}
 
 	@Test
+	void register_whenRegistrationIsDisabled_returns403() throws Exception {
+		when(service.register(any())).thenThrow(new RegistrationDisabledException());
+
+		mockMvc.perform(post("/api/auth/register")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+						{"username": "alex", "password": "secret-password"}
+						"""))
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.status").value(403))
+				.andExpect(jsonPath("$.detail").value("Registration is closed on this server"));
+	}
+
+	@Test
 	void register_withExistingUsername_returns409() throws Exception {
 		when(service.register(any())).thenThrow(new UsernameAlreadyExistsException("alex"));
 
