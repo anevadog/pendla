@@ -5,7 +5,8 @@
 - **Estado:** MVP terminado (2026-11-10) y Fases 8 y 9 cerradas (2026-11-16). Fases 0 a 9 cerradas: todos los requisitos del MVP (RF-01 a RF-07, RNF-01 a RNF-03) cumplidos, más las notas y la fecha de entrevista, PostgreSQL en Docker Compose y un test de repositorio contra PostgreSQL real. 93 tests en verde en local (5 necesitan Docker), y probado contra PostgreSQL y JobTech.
 - **Fase 10 cerrada (2026-11-16):** registro, login con JWT y endpoints protegidos. 117 tests en verde (5 necesitan Docker), y probado de punta a punta contra PostgreSQL y JobTech.
 - **Fase 11 cerrada (2026-11-16):** cada candidatura pertenece a un usuario y la de otro usuario responde 404. 122 tests en verde (8 necesitan Docker), y probado de punta a punta con dos usuarios contra PostgreSQL.
-- **Siguiente paso:** despliegue. Falta el diseño y su aprobación; antes hay que consultar costes y decidir qué hacer con el registro abierto.
+- **Fase 12 cerrada (2026-11-16):** la API está desplegada en https://pendla.onrender.com (Render + Neon, 0 € al mes) con el registro cerrado. 125 tests en verde (8 necesitan Docker), y probado desde fuera contra la URL pública.
+- **Siguiente paso:** ninguno decidido. Pendiente aparte: rehacer las capturas de `docs/images` (son anteriores a las Fases 8, 10, 11 y 12).
 - **Bloqueos:** ninguno.
 
 ## Requisitos del MVP
@@ -223,12 +224,32 @@
 
 **Conceptos:** relaciones `@ManyToOne`, carga `LAZY` y `EAGER`, clave foránea, unique de varias columnas, migración de una columna obligatoria en tres pasos, y la diferencia entre autenticación (quién eres) y autorización (qué puedes tocar).
 
+### Fase 12 — Despliegue
+
+**Objetivo:** que la API funcione en una URL pública, sin coste y sin que desconocidos puedan crearse cuenta.
+
+- [x] F12-1: `Dockerfile` en dos etapas y `.dockerignore`. Probado en local con 512 MB contra la base de datos de Compose
+- [x] F12-2: `server.port=${PORT:8080}` y `server.forward-headers-strategy=framework`, para el puerto de Render y las URLs `https://` de Swagger
+- [x] F12-3: interruptor `registration.enabled`. Cerrado → `POST /api/auth/register` da 403
+- [x] F12-4: Neon (PostgreSQL) y Render (aplicación) creados en Frankfurt, plan gratis. Variables de entorno en Render
+- [x] F12-5: comprobado desde fuera: ping, HTTPS, Swagger, 401 sin token, 400 de validación y 403 del registro
+- [x] F12-6: README, decisiones y plan actualizados
+
+**Decidido:** Render + Neon gratis; Dockerfile propio y no buildpacks; sin perfiles; registro cerrado con un interruptor y 403. Ver F12-1 a F12-5 en `docs/decisiones.md`.
+
+**Resuelto:** el PENDIENTE de las Fases 10 y 11 sobre el registro abierto.
+
+**PENDIENTE:** las capturas del README (`docs/images/`) son anteriores a las Fases 8, 10, 11 y 12 y hay que rehacerlas.
+
+**Terminado cuando:** la URL pública responde, Swagger funciona con HTTPS, el registro da 403 y mi usuario puede hacer login y usar la API.
+
+**Conceptos:** imágenes Docker en varias etapas, la memoria de la JVM en un contenedor, variables de entorno como configuración, proxy inverso y cabeceras `X-Forwarded-*`, URL JDBC frente a cadena de conexión libpq, y los límites de un plan gratis (dormirse, arranque en frío).
+
 ## Ideas para después
 
 - Transporte público hasta la oferta (Trafiklab)
 - Refresh tokens y logout (hoy el token caduca solo, ver Fase 10)
 - Frontend
-- Despliegue, con la aplicación en un contenedor (`Dockerfile`)
 - Varios entornos (dev/prod)
 - Paginación en la búsqueda (`offset`)
 - Más ciudades o búsqueda de municipios con la API de taxonomía de JobTech
@@ -243,3 +264,4 @@
 - Historial de cambios de estado con fecha
 - Devolver el total de resultados de JobTech junto a la lista ("105 resultados, se muestran 20")
 - Leer la versión de la API en Swagger desde el `pom.xml` en lugar de escribirla a mano
+- Producción: límite de peticiones por usuario, copias de seguridad de la base de datos y dominio propio (fuera de la Fase 12)

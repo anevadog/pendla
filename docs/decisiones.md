@@ -451,6 +451,55 @@ Aquí explico qué elegí en cada momento, qué descarté y por qué.
 - **Por qué:** el fallo grave de esta fase sería usar por descuido una consulta de `JpaRepository` que no filtra por dueño. Un mock no demuestra que la consulta SQL filtra bien, y por eso esa parte está en el test con base de datos real.
 - **Límite que conozco:** no hay un test automático de la API completa con dos tokens contra PostgreSQL; eso lo probé a mano. Tampoco hay test de la migración con filas ya existentes. El test de integración por HTTP sigue en "Ideas para después".
 
+## Fase 12 — Despliegue
+
+### F12-1. Render para la aplicación y Neon para PostgreSQL, gratis
+
+- **Elegí:** la aplicación en Render (plan Free: 0,1 CPU y 512 MB) y la base de datos en Neon (plan Free), las dos en Frankfurt. Coste: 0 € al mes. Precios y límites consultados el 2026-11-16.
+- **Descarté:**
+  - Render con su propio PostgreSQL gratis: la base de datos caduca a los 30 días.
+  - Railway: sin capa gratis permanente, unos 5 $ al mes.
+  - Fly.io: las cuentas nuevas solo tienen una prueba corta.
+  - Koyeb: las fuentes se contradecían sobre si pide tarjeta.
+- **Coste que acepto:** la aplicación se duerme tras 15 minutos sin tráfico, y la primera petición después tarda alrededor de un minuto. Neon se suspende a los 5 minutos y tiene 1 GB. Para un proyecto de portafolio con un usuario me vale; en el README está avisado.
+- **Detalle:** Render despliega en cada push a `master`. La región es la misma en los dos servicios para que cada consulta no cruce Europa.
+
+### F12-2. `Dockerfile` en dos etapas
+
+- **Elegí:** una etapa compila con el JDK 25 y `mvnw`, y la otra solo lleva el JRE 25 y el jar. La aplicación corre con un usuario sin privilegios y con `-XX:MaxRAMPercentage=75`. Un `.dockerignore` deja fuera `.env`, `target/` y `.git`.
+- **Descarté:** `spring-boot:build-image` (buildpacks).
+- **Por qué:** Render construye la imagen desde el repositorio, así que no necesito un registro de imágenes. Buildpacks no pide escribir nada, pero es una caja negra, y un Dockerfile de 15 líneas lo puedo explicar línea a línea. Con dos etapas, la imagen final no lleva Maven, ni el código fuente, ni el JDK.
+- **Detalle:**
+  - Las dependencias se descargan en un paso aparte, antes de copiar `src/`. Docker guarda cada paso en caché, así que mientras `pom.xml` no cambie no se vuelven a descargar.
+  - La imagen se construye con `-DskipTests`, porque los tests ya pasan en CI y el de repositorio necesita Docker.
+  - El límite de memoria del 75 % deja sitio a la JVM fuera del heap. Probado en local con un contenedor de 512 MB: usa unos 245 MB.
+
+### F12-3. La misma configuración en local y en producción, sin perfiles
+
+- **Elegí:** producción usa las mismas propiedades que en local (`DB_URL`, `DB_USERNAME`, `DB_PASSWORD` y `JWT_SECRET`), definidas como variables de entorno en Render. En `application.properties` añadí dos líneas:
+  - `server.port=${PORT:8080}`: Render dice en qué puerto escuchar.
+  - `server.forward-headers-strategy=framework`: hace que Spring lea las cabeceras `X-Forwarded-*` del proxy.
+- **Descarté:** un perfil `prod` con su propio archivo de propiedades.
+- **Por qué:** no hay nada que cambie entre entornos aparte de las variables, y un perfil sería un segundo archivo que mantener sin necesidad.
+- **Detalle:** Render recibe HTTPS y pasa la petición a la aplicación por HTTP. Sin `forward-headers-strategy`, Swagger generaba la URL del servidor con `http://` y el botón "Try it out" fallaba. Lo comprobé en local mandando las cabeceras a mano y después en producción.
+
+### F12-4. El registro se cierra con un interruptor
+
+- **Elegí:** la propiedad `registration.enabled` (variable `REGISTRATION_ENABLED`), `true` por defecto. Con `false`, `POST /api/auth/register` responde **403** como `ProblemDetail`, y es lo primero que comprueba el servicio. En producción está a `false` desde que creé mi usuario. El login sigue funcionando.
+- **Descarté:**
+  - Un código de invitación en el registro: un campo más, otro secreto y más casos que probar.
+  - Dejar el registro abierto: cualquiera podría llenar mi base de datos y usar JobTech a través de mi API.
+- **Por qué 403:** la petición se entiende y está bien formada, pero este servidor no la permite. No es un 401, porque no falta autenticación, ni un 404, porque la ruta existe y está documentada.
+- **Por qué `true` por defecto:** en local y en los tests no hay que configurar nada. El precio es que en producción hay que acordarse de ponerlo a `false`.
+- **Lo que pasó:** en el primer despliegue la variable no estaba en Render y el registro quedó abierto. Una comprobación con un usuario inventado lo creó; cerré el registro, borré ese usuario en Neon y comprobé que no se había registrado nadie más. La comprobación correcta es mandar un registro con un nombre que ya existe: si está abierto da 409, si está cerrado da 403, y en ningún caso crea nada.
+- **Detalle:** el registro cerrado comprueba el interruptor antes de mirar la base de datos, así que la respuesta no revela si un usuario existe. La validación del cuerpo sí va antes (un cuerpo vacío da 400), porque la hace Spring antes de llamar al servicio.
+
+### F12-5. `DB_URL` en formato JDBC
+
+- **Lo que pasó:** el primer despliegue falló al arrancar con `'url' must start with "jdbc"`. Neon da la cadena de conexión en el formato de libpq (`postgresql://usuario:contraseña@host/base?sslmode=require`), y Spring necesita una URL JDBC.
+- **Cómo queda:** `DB_URL=jdbc:postgresql://<host>/<base>?sslmode=require`, con el usuario y la contraseña en sus propias variables y la conexión directa, sin el pooler de Neon.
+- **Por qué sin el pooler:** Flyway funciona mejor con una conexión directa, y con un solo usuario no necesito agrupar conexiones.
+
 ## Stack
 
 | Decisión | Elegí | Descarté | Por qué |
@@ -463,4 +512,5 @@ Aquí explico qué elegí en cada momento, qué descarté y por qué.
 | Simular JobTech en tests | `MockRestServiceServer` | WireMock | Viene con Spring Test y me basta para el MVP |
 | Autenticación | JWT validado por Spring Security | Sesión con cookie; `jjwt` con filtro propio | API sin estado y sin código de seguridad escrito a mano. Ver F10-1 y F10-2 |
 | Base de datos en el test de repositorio | Testcontainers (PostgreSQL real) | H2 en memoria | H2 no se comporta igual que PostgreSQL. Ver F9-1 |
+| Despliegue | Render (aplicación) + Neon (PostgreSQL), plan gratis | Railway, Fly.io, PostgreSQL de Render | 0 € al mes y sin base de datos que caduque. Ver F12-1 |
 | Organización del código | Por funcionalidad (`application/`, `jobsearch/`, `common/`) | Por capas (`controller/`, `service/`…) | Todo lo de una funcionalidad está junto, y la capa se ve en el nombre de cada clase. Por capas, cada funcionalidad quedaría repartida en cinco carpetas |

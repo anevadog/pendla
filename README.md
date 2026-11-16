@@ -10,6 +10,8 @@ Pendla does three things:
 2. **Track my applications**: save the ads I am interested in, follow their status (`SAVED → SENT → INTERVIEW → REJECTED / OFFER`) and keep notes and the interview date on each one.
 3. **Protect the API**: users register and log in, every other endpoint needs a JWT, and each user sees only their own applications.
 
+**Live:** [pendla.onrender.com/swagger-ui.html](https://pendla.onrender.com/swagger-ui.html). It runs on a free plan that sleeps when nobody uses it, so the first request can take about a minute. Registration is closed on the public server, so the endpoints can be browsed but not used without my account: to try it end to end, run it locally (below).
+
 ## Why I built it
 
 I want to work in Sweden as a backend Java developer, and I use this tool in my own job search. It is also a portfolio project: small, finished, and every part of it explainable.
@@ -26,11 +28,12 @@ What it demonstrates:
 - Persistence with Spring Data JPA and PostgreSQL, with a versioned schema (Flyway migrations)
 - Unit and web-layer tests that need no database and no network, plus a repository test against a real PostgreSQL (Testcontainers)
 - Continuous integration: GitHub Actions runs the tests on every push
+- Deployment: a two-stage Dockerfile, deployed to Render with the database on Neon, configured only through environment variables
 - API documentation with Swagger (OpenAPI)
 
 ## Tech stack
 
-Java 25 · Spring Boot 4.1 · Maven · Spring Data JPA · PostgreSQL · Flyway · Bean Validation · Spring Security (JWT) · RestClient · springdoc-openapi · JUnit 5 · Mockito · MockMvc · MockRestServiceServer · Testcontainers · Docker Compose
+Java 25 · Spring Boot 4.1 · Maven · Spring Data JPA · PostgreSQL · Flyway · Bean Validation · Spring Security (JWT) · RestClient · springdoc-openapi · JUnit 5 · Mockito · MockMvc · MockRestServiceServer · Testcontainers · Docker · Docker Compose · Render · Neon
 
 ## Screenshots
 
@@ -48,7 +51,7 @@ A status change that is not allowed (`SENT → SAVED`) returns `409` as `Problem
 
 ## Status
 
-Finished and ready to use: every feature below works end to end against PostgreSQL and the real JobTech API, and the tests run on every push. Technical decisions and the alternatives I discarded: [docs/decisiones.md](docs/decisiones.md) (Spanish).
+Finished and deployed: every feature below works end to end against PostgreSQL and the real JobTech API, the tests run on every push, and Render deploys every push to `master`. Technical decisions and the alternatives I discarded: [docs/decisiones.md](docs/decisiones.md) (Spanish).
 
 Planned next, one small step at a time:
 
@@ -87,6 +90,29 @@ Prerequisites: Java 25, and either Docker or PostgreSQL installed locally.
 
 4. Check it is up: `http://localhost:8080/api/ping` returns `pong`.
 5. Open Swagger UI at `http://localhost:8080/swagger-ui.html`. Every endpoint has example values ready for "Try it out". Register and log in under **Auth**, then paste the token in the **Authorize** button to use the other endpoints.
+
+### Run it as a container
+
+The `Dockerfile` builds the application in one stage and runs it on a plain Java runtime in another. This is how the public server runs it. With the Compose database up:
+
+```bash
+docker build -t pendla .
+docker run --rm --env-file .env -e DB_URL=jdbc:postgresql://postgres:5432/pendla --network pendla_default -p 8080:8080 pendla
+```
+
+Inside the Compose network the database is `postgres:5432`, not `localhost:5433`.
+
+### Configuration
+
+Everything is read from environment variables (or `.env` when running locally):
+
+| Variable | Required | Meaning |
+|---|---|---|
+| `DB_URL` | yes | JDBC URL, for example `jdbc:postgresql://localhost:5433/pendla`. A hosted database may need `?sslmode=require` |
+| `DB_USERNAME`, `DB_PASSWORD` | yes | Database user and password |
+| `JWT_SECRET` | yes | Signs the login tokens. At least 32 characters |
+| `REGISTRATION_ENABLED` | no | `true` by default. `false` closes registration (`403`); the public server uses it |
+| `PORT` | no | HTTP port, `8080` by default. Hosting platforms set it |
 
 ## Typical flow
 
@@ -220,7 +246,7 @@ The response is the same application with the two fields. The date is always ret
 | Method | Path | Description | Errors |
 |---|---|---|---|
 | GET | `/api/ping` | Health check, returns `pong` | — |
-| POST | `/api/auth/register` | Create a user account (`201`). The username is stored in lowercase | `400` invalid data · `409` username already taken |
+| POST | `/api/auth/register` | Create a user account (`201`). The username is stored in lowercase | `400` invalid data · `403` registration is closed on this server · `409` username already taken |
 | POST | `/api/auth/login` | Log in and get a JWT, valid for one hour | `400` invalid data · `401` wrong username or password |
 | GET | `/api/jobs?keyword=java&city=Göteborg` | Search job ads in JobTech, max 20. `city` is optional: Stockholm, Göteborg, Malmö or Uppsala (case-insensitive) | `400` invalid keyword or city · `502` JobTech error · `504` JobTech timeout |
 | POST | `/api/applications` | Save a job application (`201`, status `SAVED`) | `400` invalid data · `409` you already saved this JobTech ad |
@@ -304,7 +330,8 @@ One test class uses a real database:
 
 - Only four cities are supported (Stockholm, Göteborg, Malmö, Uppsala), mapped to their JobTech municipality ids.
 - Some ads have several workplaces, so a search by city can include an ad whose main address is in another city.
-- Registration is open, and a token cannot be revoked: it stays valid until it expires (one hour). There are no refresh tokens.
+- A token cannot be revoked: it stays valid until it expires (one hour). There are no refresh tokens.
+- The public server runs on a free plan: it sleeps after 15 minutes without requests and needs about a minute to wake up.
 - Validation messages follow the language of the JVM.
 - An invalid interview date returns a generic `400` (`Failed to read request`) that does not name the field.
 - Notes are not scanned for contact data: keeping them free of it is up to the user.
