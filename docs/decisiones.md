@@ -270,6 +270,46 @@ Aquí explico qué elegí en cada momento, qué descarté y por qué.
 - **Descarté:** no poner licencia.
 - **Por qué:** sin licencia, legalmente nadie puede reutilizar el código, y GitHub lo muestra como "No license". MIT es la más corta y la más habitual en proyectos personales.
 
+## Fase 8 — Notas y fecha de entrevista
+
+### F8-1. `PUT /api/applications/{id}/details` que reemplaza los dos campos
+
+- **Elegí:** un `PUT` con `notes` e `interviewAt`. Lo que llega sustituye a lo que había: un campo `null` o ausente se borra, así que `{}` borra los dos.
+- **Descarté:** un `PATCH` que cambie solo los campos que llegan, y meter los dos campos en el `POST` de creación.
+- **Por qué:** el cuerpo es un `record`, y un `record` no distingue un campo que no viene de uno que viene con `null`: los dos llegan como `null`. Con `PATCH` no podría saber si quiero borrar la fecha o dejarla como está, salvo con `Optional` o un `JsonNode`, que complican el código. Con `PUT` la regla es una sola: se guarda lo que mando. El `POST` no cambia, porque al guardar una oferta todavía no hay notas ni entrevista.
+- **Coste que acepto:** para cambiar solo las notas hay que volver a mandar la fecha, o se borra.
+
+### F8-2. `Instant` para la fecha de la entrevista
+
+- **Elegí:** `interviewAt` como `Instant` en la entidad y en los DTOs, y `TIMESTAMPTZ` en la tabla. La petición acepta una fecha ISO 8601 con desfase o con `Z`; la respuesta va siempre en UTC (`2026-11-20T10:00:00+01:00` vuelve como `2026-11-20T09:00:00Z`).
+- **Descarté:** `OffsetDateTime` y `LocalDateTime`.
+- **Por qué:** `TIMESTAMPTZ` en PostgreSQL guarda el instante, no el desfase con el que se escribió. Con `OffsetDateTime` parecería que conservo el `+01:00` y no es verdad. `LocalDateTime` no dice en qué zona es la hora, y una entrevista por videollamada puede ser desde otro país. `Instant` es lo que de verdad se guarda, y `createdAt` ya lo usa.
+- **Detalle:** una fecha sin desfase (`2026-11-20T10:00:00`) da 400, porque no se puede convertir en un instante.
+
+### F8-3. La fecha no depende del estado
+
+- **Elegí:** se puede poner o quitar la fecha de entrevista en cualquier estado, y cambiar el estado no toca ni la fecha ni las notas.
+- **Descarté:** exigir el estado `INTERVIEW` para poner la fecha, o pasar a `INTERVIEW` al ponerla.
+- **Por qué:** en la práctica me dan la fecha antes de que yo cambie el estado, y una candidatura rechazada conserva la fecha de la entrevista que tuvo. Unir las dos cosas añadiría reglas y errores nuevos sin que nada lo necesite.
+
+### F8-4. Aviso sobre datos de contacto, sin filtro
+
+- **Elegí:** avisar en Swagger y en el README de que las notas no deben llevar nombres, emails ni teléfonos de reclutadores. La API no revisa el texto.
+- **Descarté:** rechazar las notas que parezcan tener un email o un teléfono, con expresiones regulares.
+- **Por qué:** un filtro así falla en los dos sentidos: bloquea texto normal (un número de referencia parece un teléfono) y deja pasar un nombre, que no se puede detectar con una expresión regular. Daría una falsa sensación de control. Las notas las escribo yo, así que la norma es mía y queda escrita.
+
+### F8-5. Una fecha inválida da el 400 genérico
+
+- **Elegí:** dejar el 400 que da Spring cuando no puede leer el cuerpo (`"detail": "Failed to read request"`), sin `errors.interviewAt`.
+- **Descarté:** recibir la fecha como `String` y validarla a mano, o un manejador específico para este error.
+- **Por qué:** el fallo ocurre al convertir el JSON, antes de la validación, así que no pasa por el código que rellena `errors`. Recibir un `String` me obligaría a convertirlo yo y a repetir lo que Jackson ya hace.
+- **Límite que conozco:** el error no dice qué campo está mal. Las notas demasiado largas sí llevan `errors.notes`, porque eso es Bean Validation.
+
+### F8-6. Migración `V2` con columnas que admiten `NULL`
+
+- **Elegí:** `V2__add_notes_and_interview_at.sql` añade las dos columnas sin `NOT NULL` y sin valor por defecto. `V1` no se toca.
+- **Por qué:** la tabla ya tenía filas, y en ellas los dos campos quedan vacíos, que es justo lo que significan. El límite de 2000 está en dos sitios, `@Size(max = 2000)` en el DTO y `VARCHAR(2000)` en la tabla: el primero da un 400 claro y el segundo es la última barrera.
+
 ## Stack
 
 | Decisión | Elegí | Descarté | Por qué |

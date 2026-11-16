@@ -7,7 +7,7 @@ A small REST API to track my job search in Sweden.
 Pendla does two things:
 
 1. **Search real job ads** from the public JobTech API (Arbetsförmedlingen) by keyword and city, and return a simplified version of each ad (title, employer, city, link).
-2. **Track my applications**: save the ads I am interested in and follow their status: `SAVED → SENT → INTERVIEW → REJECTED / OFFER`.
+2. **Track my applications**: save the ads I am interested in, follow their status (`SAVED → SENT → INTERVIEW → REJECTED / OFFER`) and keep notes and the interview date on each one.
 
 ## Why I built it
 
@@ -49,7 +49,7 @@ Finished and ready to use: every feature below works end to end against PostgreS
 
 Planned next, one small step at a time:
 
-- Notes and interview date on each application (with a new Flyway migration)
+- PostgreSQL in Docker Compose and integration tests with Testcontainers
 - Pagination for the job search and the applications list
 - More cities, using the JobTech taxonomy API
 
@@ -116,7 +116,9 @@ curl -X POST http://localhost:8080/api/applications \
   "city": "Stockholm",
   "url": "https://arbetsformedlingen.se/platsbanken/annonser/31696992",
   "status": "SAVED",
-  "createdAt": "2026-11-09T10:00:00Z"
+  "createdAt": "2026-11-09T10:00:00Z",
+  "notes": null,
+  "interviewAt": null
 }
 ```
 
@@ -147,6 +149,26 @@ curl -X PATCH http://localhost:8080/api/applications/1/status \
 }
 ```
 
+**5. Add notes and the interview date:**
+
+```bash
+curl -X PUT http://localhost:8080/api/applications/1/details \
+  -H "Content-Type: application/json" \
+  -d '{"notes": "Technical interview with the backend team. Prepare Spring and SQL questions.",
+       "interviewAt": "2026-11-20T10:00:00+01:00"}'
+```
+
+The response is the same application with the two fields. The date is always returned in UTC:
+
+```json
+{
+  "notes": "Technical interview with the backend team. Prepare Spring and SQL questions.",
+  "interviewAt": "2026-11-20T09:00:00Z"
+}
+```
+
+`PUT` replaces both fields: a field that is `null` or missing is cleared, so `{}` removes the notes and the date. Notes are free text for my own use and must not include third-party contact data (recruiter names, emails or phone numbers).
+
 ## Endpoints
 
 | Method | Path | Description | Errors |
@@ -157,6 +179,7 @@ curl -X PATCH http://localhost:8080/api/applications/1/status \
 | GET | `/api/applications` | List applications, newest first. Optional filter: `?status=SENT` | `400` invalid status |
 | GET | `/api/applications/{id}` | Get one application | `404` not found |
 | PATCH | `/api/applications/{id}/status` | Change the status of an application | `400` invalid status · `404` not found · `409` transition not allowed |
+| PUT | `/api/applications/{id}/details` | Replace the notes and the interview date (`null` or missing clears the field). Works in any status | `400` notes over 2000 characters or invalid date · `404` not found |
 | DELETE | `/api/applications/{id}` | Delete an application (`204`) | `404` not found |
 
 ### Status transitions
@@ -214,7 +237,7 @@ The code is organized by feature: everything about one feature is in one package
 
 No database and no network needed:
 
-- **Domain:** status transitions (all 25 combinations) and the entity's `changeStatus`, with plain JUnit.
+- **Domain:** status transitions (all 25 combinations) and the entity's `changeStatus` and `updateDetails`, with plain JUnit.
 - **Services:** business rules with Mockito mocks (duplicates, not found, transitions, city validation, mapping).
 - **Controllers:** `@WebMvcTest` + MockMvc for status codes, validation and `ProblemDetail` responses.
 - **JobTech client:** `MockRestServiceServer` simulates JobTech: success, server error, unreadable body, no connection and timeout.
@@ -225,6 +248,8 @@ No database and no network needed:
 - Some ads have several workplaces, so a search by city can include an ad whose main address is in another city.
 - Single user, local only: no authentication.
 - Validation messages follow the language of the JVM.
+- An invalid interview date returns a generic `400` (`Failed to read request`) that does not name the field.
+- Notes are not scanned for contact data: keeping them free of it is up to the user.
 
 ## Data source
 

@@ -2,8 +2,8 @@
 
 ## Estado actual y siguiente paso
 
-- **Estado:** proyecto terminado y listo para usar (2026-11-10). Fases 0 a 7 cerradas: todos los requisitos del MVP (RF-01 a RF-07, RNF-01 a RNF-03) cumplidos, 78 tests en verde en local y en GitHub Actions, y probado en Swagger contra PostgreSQL y JobTech.
-- **Siguiente paso:** ninguno obligatorio. El proyecto crecerá poco a poco desde "Ideas para después". La primera candidata ya tiene diseño (Fase 8, ver abajo), pero no está implementada.
+- **Estado:** MVP terminado (2026-11-10) y Fase 8 cerrada (2026-11-16). Fases 0 a 8 cerradas: todos los requisitos del MVP (RF-01 a RF-07, RNF-01 a RNF-03) cumplidos, más las notas y la fecha de entrevista en cada candidatura. 88 tests en verde en local, y probado contra PostgreSQL y JobTech.
+- **Siguiente paso:** Fase 9, Docker Compose para PostgreSQL y tests de integración con Testcontainers. Falta el diseño y su aprobación. Después: usuarios con Spring Security en dos fases (JWT o sesión: **PENDIENTE**) y, por último, el despliegue (consultar costes antes).
 - **Bloqueos:** ninguno.
 
 ## Requisitos del MVP
@@ -161,6 +161,19 @@
 
 **Conceptos:** licencias de software y cómo presentar un proyecto en un portafolio.
 
+### Fase 8 — Notas y fecha de entrevista
+
+**Objetivo:** apuntar en cada candidatura notas libres y la fecha de la entrevista.
+
+- [x] F8-1: migración `V2__add_notes_and_interview_at.sql` (`notes VARCHAR(2000)`, `interview_at TIMESTAMPTZ`)
+- [x] F8-2: `PUT /api/applications/{id}/details` reemplaza los dos campos (`null` o ausente los borra). Notas de más de 2000 caracteres o fecha inválida → 400. Id inexistente → 404
+- [x] F8-3: `notes` e `interviewAt` en todas las respuestas de candidaturas; la fecha, siempre en UTC
+- [x] F8-4: README, decisiones y plan actualizados
+
+**Terminado cuando:** el `PUT` guarda, devuelve y borra los dos campos contra PostgreSQL, y los tests pasan.
+
+**Conceptos:** segunda migración de Flyway sobre una tabla con datos, `Instant` frente a `OffsetDateTime`, `TIMESTAMPTZ` en PostgreSQL, y `PUT` (reemplazar) frente a `PATCH` (cambiar una parte).
+
 ## Ideas para después
 
 - Transporte público hasta la oferta (Trafiklab)
@@ -170,7 +183,7 @@
 - Varios entornos (dev/prod)
 - Paginación en la búsqueda (`offset`)
 - Más ciudades o búsqueda de municipios con la API de taxonomía de JobTech
-- Notas y fecha de entrevista en cada candidatura (Fase 8, diseñada y sin implementar). Diseño propuesto: migración `V2` con `notes VARCHAR(2000)` e `interview_at TIMESTAMPTZ`; `interviewAt` como `Instant`; `PUT /api/applications/{id}/details`, que reemplaza los dos campos (`null` los borra); avisar en Swagger y en el README de que las notas no deben llevar datos de contacto de terceros, sin filtrarlas con expresiones regulares
+- Indicar el campo en el 400 de una fecha inválida (`errors.interviewAt`), ver F8-5
 - Documentar los códigos de error con `@ApiResponse` (hoy Swagger marca el 409 como "Undocumented", ver F4-1)
 - Editar los campos de una candidatura
 - Tests de integración contra PostgreSQL real (Testcontainers, requiere Docker)
