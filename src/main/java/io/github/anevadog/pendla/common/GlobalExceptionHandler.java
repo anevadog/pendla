@@ -28,6 +28,8 @@ import io.github.anevadog.pendla.application.JobApplicationNotFoundException;
 import io.github.anevadog.pendla.jobsearch.JobTechTimeoutException;
 import io.github.anevadog.pendla.jobsearch.JobTechUnavailableException;
 import io.github.anevadog.pendla.jobsearch.UnsupportedCityException;
+import io.github.anevadog.pendla.user.PasswordTooLongException;
+import io.github.anevadog.pendla.user.UsernameAlreadyExistsException;
 import tools.jackson.databind.exc.InvalidFormatException;
 
 /**
@@ -69,6 +71,16 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 	@ExceptionHandler(JobTechTimeoutException.class)
 	public ProblemDetail handleJobTechTimeout(JobTechTimeoutException ex) {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.GATEWAY_TIMEOUT, ex.getMessage());
+	}
+
+	@ExceptionHandler(UsernameAlreadyExistsException.class)
+	public ProblemDetail handleUsernameAlreadyExists(UsernameAlreadyExistsException ex) {
+		return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+	}
+
+	@ExceptionHandler(PasswordTooLongException.class)
+	public ProblemDetail handlePasswordTooLong(PasswordTooLongException ex) {
+		return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
 	}
 
 	/**
