@@ -3,48 +3,65 @@ package io.github.anevadog.pendla.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 
 import io.github.anevadog.pendla.application.dto.CreateJobApplicationRequest;
 import io.github.anevadog.pendla.application.dto.JobApplicationResponse;
 import io.github.anevadog.pendla.application.dto.UpdateDetailsRequest;
 import io.github.anevadog.pendla.application.dto.UpdateStatusRequest;
+import io.github.anevadog.pendla.user.AppUser;
+import io.github.anevadog.pendla.user.AppUserRepository;
 
 /**
- * Unit tests: the repository is a Mockito mock, no Spring context and no database.
+ * Unit tests: the repositories are Mockito mocks, no Spring context and no database.
+ *
+ * The logged-in user is always "alex". The mock only answers when it is asked for alex's data,
+ * so a test passes only if the service filters by the right owner.
  */
 @ExtendWith(MockitoExtension.class)
 class JobApplicationServiceTest {
 
+	private final AppUser alex = new AppUser("alex", "hash");
+
 	@Mock
 	private JobApplicationRepository repository;
 
+	@Mock
+	private AppUserRepository userRepository;
+
 	@InjectMocks
 	private JobApplicationService service;
+
+	@BeforeEach
+	void alexExists() {
+		when(userRepository.findByUsername("alex")).thenReturn(Optional.of(alex));
+	}
 
 	@Test
 	void create_withNewJobtechId_savesWithStatusSaved() {
 		var request = new CreateJobApplicationRequest(
 				"31696992", " Java Developer ", "Deploja AB", "Stockholm", "https://example.com/ad");
-		when(repository.existsByJobtechId("31696992")).thenReturn(false);
+		when(repository.existsByOwnerAndJobtechId(alex, "31696992")).thenReturn(false);
 		// saveAndFlush() returns the same entity it receives
 		when(repository.saveAndFlush(any(JobApplication.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-		JobApplicationResponse response = service.create(request);
+		JobApplicationResponse response = service.create("alex", request);
 
 		assertThat(response.status()).isEqualTo(ApplicationStatus.SAVED);
 		assertThat(response.jobtechId()).isEqualTo("31696992");
@@ -56,9 +73,9 @@ class JobApplicationServiceTest {
 	@Test
 	void create_withDuplicateJobtechId_throwsDuplicate() {
 		var request = new CreateJobApplicationRequest("31696992", "Java Developer", "Deploja AB", null, null);
-		when(repository.existsByJobtechId("31696992")).thenReturn(true);
+		when(repository.existsByOwnerAndJobtechId(alex, "31696992")).thenReturn(true);
 
-		assertThatThrownBy(() -> service.create(request))
+		assertThatThrownBy(() -> service.create("alex", request))
 				.isInstanceOf(DuplicateJobApplicationException.class)
 				.hasMessageContaining("31696992");
 		verify(repository, never()).saveAndFlush(any());
@@ -68,11 +85,11 @@ class JobApplicationServiceTest {
 	void create_whenUniqueConstraintFails_throwsDuplicate() {
 		// Race: the check finds nothing, but another request inserts the same jobtechId before ours
 		var request = new CreateJobApplicationRequest("31696992", "Java Developer", "Deploja AB", null, null);
-		when(repository.existsByJobtechId("31696992")).thenReturn(false);
+		when(repository.existsByOwnerAndJobtechId(alex, "31696992")).thenReturn(false);
 		when(repository.saveAndFlush(any(JobApplication.class)))
 				.thenThrow(new DataIntegrityViolationException("duplicate key"));
 
-		assertThatThrownBy(() -> service.create(request))
+		assertThatThrownBy(() -> service.create("alex", request))
 				.isInstanceOf(DuplicateJobApplicationException.class)
 				.hasMessageContaining("31696992");
 	}
@@ -83,7 +100,7 @@ class JobApplicationServiceTest {
 		when(repository.saveAndFlush(any(JobApplication.class)))
 				.thenThrow(new DataIntegrityViolationException("other constraint"));
 
-		assertThatThrownBy(() -> service.create(request))
+		assertThatThrownBy(() -> service.create("alex", request))
 				.isInstanceOf(DataIntegrityViolationException.class);
 	}
 
@@ -92,10 +109,10 @@ class JobApplicationServiceTest {
 		var request = new CreateJobApplicationRequest(null, "Java Developer", "Deploja AB", null, null);
 		when(repository.saveAndFlush(any(JobApplication.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-		JobApplicationResponse response = service.create(request);
+		JobApplicationResponse response = service.create("alex", request);
 
 		assertThat(response.jobtechId()).isNull();
-		verify(repository, never()).existsByJobtechId(anyString());
+		verify(repository, never()).existsByOwnerAndJobtechId(any(), any());
 	}
 
 	@Test
@@ -103,75 +120,94 @@ class JobApplicationServiceTest {
 		var request = new CreateJobApplicationRequest("  ", "Java Developer", "Deploja AB", "", " ");
 		when(repository.saveAndFlush(any(JobApplication.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-		JobApplicationResponse response = service.create(request);
+		JobApplicationResponse response = service.create("alex", request);
 
 		assertThat(response.jobtechId()).isNull();
 		assertThat(response.city()).isNull();
 		assertThat(response.url()).isNull();
-		verify(repository, never()).existsByJobtechId(anyString());
+		verify(repository, never()).existsByOwnerAndJobtechId(any(), any());
 	}
 
 	@Test
-	void findAll_returnsResponsesInRepositoryOrder() {
-		var newest = new JobApplication(null, "Backend Developer", "Spotify", "Stockholm", null);
-		var oldest = new JobApplication(null, "Java Developer", "Deploja AB", "Stockholm", null);
-		when(repository.findAllByOrderByCreatedAtDesc()).thenReturn(List.of(newest, oldest));
+	void create_whenUserOfTokenDoesNotExist_throwsUsernameNotFound() {
+		var request = new CreateJobApplicationRequest(null, "Java Developer", "Deploja AB", null, null);
+		when(userRepository.findByUsername("alex")).thenReturn(Optional.empty());
 
-		List<JobApplicationResponse> responses = service.findAll(null);
+		assertThatThrownBy(() -> service.create("alex", request))
+				.isInstanceOf(UsernameNotFoundException.class);
+		verifyNoInteractions(repository);
+	}
+
+	@Test
+	void findAll_returnsOwnApplicationsInRepositoryOrder() {
+		var newest = new JobApplication(alex, null, "Backend Developer", "Spotify", "Stockholm", null);
+		var oldest = new JobApplication(alex, null, "Java Developer", "Deploja AB", "Stockholm", null);
+		when(repository.findAllByOwnerOrderByCreatedAtDesc(alex)).thenReturn(List.of(newest, oldest));
+
+		List<JobApplicationResponse> responses = service.findAll("alex", null);
 
 		assertThat(responses)
 				.extracting(JobApplicationResponse::title)
 				.containsExactly("Backend Developer", "Java Developer");
-		verify(repository, never()).findAllByStatusOrderByCreatedAtDesc(any());
+		verify(repository, never()).findAllByOwnerAndStatusOrderByCreatedAtDesc(any(), any());
+		// The unfiltered query of JpaRepository would return everybody's applications
+		verify(repository, never()).findAll();
 	}
 
 	@Test
 	void findAll_withNoApplications_returnsEmptyList() {
-		when(repository.findAllByOrderByCreatedAtDesc()).thenReturn(List.of());
+		when(repository.findAllByOwnerOrderByCreatedAtDesc(alex)).thenReturn(List.of());
 
-		assertThat(service.findAll(null)).isEmpty();
+		assertThat(service.findAll("alex", null)).isEmpty();
 	}
 
 	@Test
 	void findAll_withStatus_usesFilteredQuery() {
-		var saved = new JobApplication(null, "Java Developer", "Deploja AB", "Stockholm", null);
-		when(repository.findAllByStatusOrderByCreatedAtDesc(ApplicationStatus.SAVED)).thenReturn(List.of(saved));
+		var saved = new JobApplication(alex, null, "Java Developer", "Deploja AB", "Stockholm", null);
+		when(repository.findAllByOwnerAndStatusOrderByCreatedAtDesc(alex, ApplicationStatus.SAVED))
+				.thenReturn(List.of(saved));
 
-		List<JobApplicationResponse> responses = service.findAll(ApplicationStatus.SAVED);
+		List<JobApplicationResponse> responses = service.findAll("alex", ApplicationStatus.SAVED);
 
 		assertThat(responses)
 				.extracting(JobApplicationResponse::title)
 				.containsExactly("Java Developer");
-		verify(repository, never()).findAllByOrderByCreatedAtDesc();
+		verify(repository, never()).findAllByOwnerOrderByCreatedAtDesc(any());
 	}
 
 	@Test
-	void findById_withExistingId_returnsResponse() {
-		var application = new JobApplication("31696992", "Java Developer", "Deploja AB", "Stockholm", null);
-		when(repository.findById(1L)).thenReturn(Optional.of(application));
+	void findById_withOwnApplication_returnsResponse() {
+		var application = new JobApplication(alex, "31696992", "Java Developer", "Deploja AB", "Stockholm", null);
+		when(repository.findByIdAndOwner(1L, alex)).thenReturn(Optional.of(application));
 
-		JobApplicationResponse response = service.findById(1L);
+		JobApplicationResponse response = service.findById("alex", 1L);
 
 		assertThat(response.jobtechId()).isEqualTo("31696992");
 		assertThat(response.title()).isEqualTo("Java Developer");
 		assertThat(response.status()).isEqualTo(ApplicationStatus.SAVED);
 	}
 
-	@Test
-	void findById_withUnknownId_throwsNotFound() {
-		when(repository.findById(99L)).thenReturn(Optional.empty());
+	// In the four "unknown or another user's" tests below, the repository finds nothing for (id, alex).
+	// That is what the real query returns in both cases, so the service cannot tell them apart.
 
-		assertThatThrownBy(() -> service.findById(99L))
+	@Test
+	void findById_withUnknownIdOrAnotherUsersApplication_throwsNotFound() {
+		when(repository.findByIdAndOwner(99L, alex)).thenReturn(Optional.empty());
+
+		assertThatThrownBy(() -> service.findById("alex", 99L))
 				.isInstanceOf(JobApplicationNotFoundException.class)
 				.hasMessageContaining("99");
+		// The query without owner would find another user's application
+		verify(repository, never()).findById(any());
 	}
 
 	@Test
 	void changeStatus_validTransition_returnsUpdatedStatus() {
-		var application = new JobApplication(null, "Java Developer", "Deploja AB", null, null);
-		when(repository.findById(1L)).thenReturn(Optional.of(application));
+		var application = new JobApplication(alex, null, "Java Developer", "Deploja AB", null, null);
+		when(repository.findByIdAndOwner(1L, alex)).thenReturn(Optional.of(application));
 
-		JobApplicationResponse response = service.changeStatus(1L, new UpdateStatusRequest(ApplicationStatus.SENT));
+		JobApplicationResponse response = service.changeStatus("alex", 1L,
+				new UpdateStatusRequest(ApplicationStatus.SENT));
 
 		assertThat(response.status()).isEqualTo(ApplicationStatus.SENT);
 		// Dirty checking saves the change: the service must not call save()
@@ -180,30 +216,31 @@ class JobApplicationServiceTest {
 
 	@Test
 	void changeStatus_invalidTransition_throwsInvalidStatusTransitionException() {
-		var application = new JobApplication(null, "Java Developer", "Deploja AB", null, null);
-		when(repository.findById(1L)).thenReturn(Optional.of(application));
+		var application = new JobApplication(alex, null, "Java Developer", "Deploja AB", null, null);
+		when(repository.findByIdAndOwner(1L, alex)).thenReturn(Optional.of(application));
 
-		assertThatThrownBy(() -> service.changeStatus(1L, new UpdateStatusRequest(ApplicationStatus.OFFER)))
+		assertThatThrownBy(() -> service.changeStatus("alex", 1L, new UpdateStatusRequest(ApplicationStatus.OFFER)))
 				.isInstanceOf(InvalidStatusTransitionException.class)
 				.hasMessage("Cannot change status from SAVED to OFFER");
 	}
 
 	@Test
-	void changeStatus_unknownId_throwsNotFound() {
-		when(repository.findById(99L)).thenReturn(Optional.empty());
+	void changeStatus_withUnknownIdOrAnotherUsersApplication_throwsNotFound() {
+		when(repository.findByIdAndOwner(99L, alex)).thenReturn(Optional.empty());
 
-		assertThatThrownBy(() -> service.changeStatus(99L, new UpdateStatusRequest(ApplicationStatus.SENT)))
+		assertThatThrownBy(() -> service.changeStatus("alex", 99L, new UpdateStatusRequest(ApplicationStatus.SENT)))
 				.isInstanceOf(JobApplicationNotFoundException.class)
 				.hasMessageContaining("99");
+		verify(repository, never()).findById(any());
 	}
 
 	@Test
-	void updateDetails_withExistingId_returnsUpdatedResponse() {
-		var application = new JobApplication(null, "Java Developer", "Deploja AB", null, null);
-		when(repository.findById(1L)).thenReturn(Optional.of(application));
+	void updateDetails_withOwnApplication_returnsUpdatedResponse() {
+		var application = new JobApplication(alex, null, "Java Developer", "Deploja AB", null, null);
+		when(repository.findByIdAndOwner(1L, alex)).thenReturn(Optional.of(application));
 		Instant interviewAt = Instant.parse("2026-11-20T09:00:00Z");
 
-		JobApplicationResponse response = service.updateDetails(1L,
+		JobApplicationResponse response = service.updateDetails("alex", 1L,
 				new UpdateDetailsRequest(" Prepare Spring questions ", interviewAt));
 
 		assertThat(response.notes()).isEqualTo("Prepare Spring questions");
@@ -214,40 +251,44 @@ class JobApplicationServiceTest {
 
 	@Test
 	void updateDetails_withBlankNotes_storesNull() {
-		var application = new JobApplication(null, "Java Developer", "Deploja AB", null, null);
-		when(repository.findById(1L)).thenReturn(Optional.of(application));
+		var application = new JobApplication(alex, null, "Java Developer", "Deploja AB", null, null);
+		when(repository.findByIdAndOwner(1L, alex)).thenReturn(Optional.of(application));
 
-		JobApplicationResponse response = service.updateDetails(1L, new UpdateDetailsRequest("   ", null));
+		JobApplicationResponse response = service.updateDetails("alex", 1L, new UpdateDetailsRequest("   ", null));
 
 		assertThat(response.notes()).isNull();
 		assertThat(response.interviewAt()).isNull();
 	}
 
 	@Test
-	void updateDetails_withUnknownId_throwsNotFound() {
-		when(repository.findById(99L)).thenReturn(Optional.empty());
+	void updateDetails_withUnknownIdOrAnotherUsersApplication_throwsNotFound() {
+		when(repository.findByIdAndOwner(99L, alex)).thenReturn(Optional.empty());
 
-		assertThatThrownBy(() -> service.updateDetails(99L, new UpdateDetailsRequest("notes", null)))
+		assertThatThrownBy(() -> service.updateDetails("alex", 99L, new UpdateDetailsRequest("notes", null)))
 				.isInstanceOf(JobApplicationNotFoundException.class)
 				.hasMessageContaining("99");
+		verify(repository, never()).findById(any());
 	}
 
 	@Test
-	void delete_withExistingId_deletes() {
-		when(repository.existsById(1L)).thenReturn(true);
+	void delete_withOwnApplication_deletes() {
+		var application = new JobApplication(alex, null, "Java Developer", "Deploja AB", null, null);
+		when(repository.findByIdAndOwner(1L, alex)).thenReturn(Optional.of(application));
 
-		service.delete(1L);
+		service.delete("alex", 1L);
 
-		verify(repository).deleteById(1L);
+		verify(repository).delete(application);
 	}
 
 	@Test
-	void delete_withUnknownId_throwsNotFound() {
-		when(repository.existsById(99L)).thenReturn(false);
+	void delete_withUnknownIdOrAnotherUsersApplication_throwsNotFoundAndDeletesNothing() {
+		when(repository.findByIdAndOwner(99L, alex)).thenReturn(Optional.empty());
 
-		assertThatThrownBy(() -> service.delete(99L))
+		assertThatThrownBy(() -> service.delete("alex", 99L))
 				.isInstanceOf(JobApplicationNotFoundException.class)
 				.hasMessageContaining("99");
+		verify(repository, never()).delete(any());
+		// deleteById has no owner: it would delete another user's application
 		verify(repository, never()).deleteById(any());
 	}
 

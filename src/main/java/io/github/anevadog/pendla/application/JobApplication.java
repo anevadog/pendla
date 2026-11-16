@@ -6,13 +6,18 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
+import io.github.anevadog.pendla.user.AppUser;
+
 /**
- * A job ad I am interested in, and the status of my application to it.
+ * A job ad a user is interested in, and the status of their application to it.
  * Never returned directly in an HTTP response: see JobApplicationResponse.
  */
 @Entity
@@ -23,9 +28,16 @@ public class JobApplication {
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private Long id;
 
+	// Many applications belong to one user; the column user_id is the foreign key.
+	// LAZY: the user row is not loaded with the application, only if the code asks for it.
+	// updatable = false: an application never changes owner.
+	@ManyToOne(fetch = FetchType.LAZY, optional = false)
+	@JoinColumn(name = "user_id", nullable = false, updatable = false)
+	private AppUser owner;
+
 	// Optional: null when the application does not come from JobTech.
-	// Unique as a safety net; the service checks duplicates first (F1-2).
-	@Column(name = "jobtech_id", unique = true, length = 50)
+	// Unique per owner in the database as a safety net; the service checks duplicates first (F1-2).
+	@Column(name = "jobtech_id", length = 50)
 	private String jobtechId;
 
 	@Column(nullable = false)
@@ -59,7 +71,8 @@ public class JobApplication {
 	protected JobApplication() {
 	}
 
-	public JobApplication(String jobtechId, String title, String employer, String city, String url) {
+	public JobApplication(AppUser owner, String jobtechId, String title, String employer, String city, String url) {
+		this.owner = owner;
 		this.jobtechId = jobtechId;
 		this.title = title;
 		this.employer = employer;

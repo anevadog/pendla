@@ -25,6 +25,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -39,8 +40,9 @@ import io.github.anevadog.pendla.application.dto.UpdateDetailsRequest;
 @WebMvcTest(JobApplicationController.class)
 @Import(SecurityConfig.class)
 @TestPropertySource(properties = "jwt.secret=test-secret-with-at-least-32-characters")
-// Every test here runs as a logged-in user; what happens without a token is in SecurityConfigTest
-@WithMockUser
+// Every test here runs as the logged-in user "alex", and checks that the service is called with that username.
+// What happens without a token is in SecurityConfigTest
+@WithMockUser(username = "alex")
 class JobApplicationControllerTest {
 
 	@Autowired
@@ -53,7 +55,7 @@ class JobApplicationControllerTest {
 	void createApplication_withValidBody_returns201() throws Exception {
 		var saved = new JobApplicationResponse(1L, "31696992", "Java Developer", "Deploja AB",
 				"Stockholm", "https://example.com/ad", ApplicationStatus.SAVED, Instant.parse("2026-11-09T10:00:00Z"), null, null);
-		when(service.create(any())).thenReturn(saved);
+		when(service.create(eq("alex"), any())).thenReturn(saved);
 
 		mockMvc.perform(post("/api/applications")
 				.contentType(MediaType.APPLICATION_JSON)
@@ -76,7 +78,7 @@ class JobApplicationControllerTest {
 						"""))
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.errors.title").exists());
-		verify(service, never()).create(any());
+		verify(service, never()).create(any(), any());
 	}
 
 	@Test
@@ -101,7 +103,7 @@ class JobApplicationControllerTest {
 
 	@Test
 	void createApplication_withDuplicateJobtechId_returns409() throws Exception {
-		when(service.create(any())).thenThrow(new DuplicateJobApplicationException("31696992"));
+		when(service.create(eq("alex"), any())).thenThrow(new DuplicateJobApplicationException("31696992"));
 
 		mockMvc.perform(post("/api/applications")
 				.contentType(MediaType.APPLICATION_JSON)
@@ -118,7 +120,7 @@ class JobApplicationControllerTest {
 				"Stockholm", null, ApplicationStatus.SENT, Instant.parse("2026-11-09T12:00:00Z"), null, null);
 		var second = new JobApplicationResponse(1L, "31696992", "Java Developer", "Deploja AB",
 				"Stockholm", null, ApplicationStatus.SAVED, Instant.parse("2026-11-09T10:00:00Z"), null, null);
-		when(service.findAll(null)).thenReturn(List.of(first, second));
+		when(service.findAll("alex", null)).thenReturn(List.of(first, second));
 
 		mockMvc.perform(get("/api/applications"))
 				.andExpect(status().isOk())
@@ -128,8 +130,18 @@ class JobApplicationControllerTest {
 	}
 
 	@Test
+	void listApplications_whenUserOfTokenNoLongerExists_returns401() throws Exception {
+		// The token is valid, but the service finds no user with that username
+		when(service.findAll("alex", null)).thenThrow(new UsernameNotFoundException("No user for this token"));
+
+		mockMvc.perform(get("/api/applications"))
+				.andExpect(status().isUnauthorized())
+				.andExpect(jsonPath("$.status").value(401));
+	}
+
+	@Test
 	void listApplications_withNoApplications_returnsEmptyArray() throws Exception {
-		when(service.findAll(null)).thenReturn(List.of());
+		when(service.findAll("alex", null)).thenReturn(List.of());
 
 		mockMvc.perform(get("/api/applications"))
 				.andExpect(status().isOk())
@@ -140,7 +152,7 @@ class JobApplicationControllerTest {
 	void listApplications_withStatus_passesFilterToService() throws Exception {
 		var sent = new JobApplicationResponse(2L, null, "Backend Developer", "Spotify",
 				"Stockholm", null, ApplicationStatus.SENT, Instant.parse("2026-11-09T12:00:00Z"), null, null);
-		when(service.findAll(ApplicationStatus.SENT)).thenReturn(List.of(sent));
+		when(service.findAll("alex", ApplicationStatus.SENT)).thenReturn(List.of(sent));
 
 		mockMvc.perform(get("/api/applications").param("status", "SENT"))
 				.andExpect(status().isOk())
@@ -154,14 +166,14 @@ class JobApplicationControllerTest {
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.detail").value(
 						"Invalid value 'FOO' for 'status'. Allowed values: SAVED, SENT, INTERVIEW, REJECTED, OFFER"));
-		verify(service, never()).findAll(any());
+		verify(service, never()).findAll(any(), any());
 	}
 
 	@Test
 	void getApplication_withExistingId_returns200() throws Exception {
 		var found = new JobApplicationResponse(1L, "31696992", "Java Developer", "Deploja AB",
 				"Stockholm", null, ApplicationStatus.SENT, Instant.parse("2026-11-09T10:00:00Z"), null, null);
-		when(service.findById(1L)).thenReturn(found);
+		when(service.findById("alex", 1L)).thenReturn(found);
 
 		mockMvc.perform(get("/api/applications/1"))
 				.andExpect(status().isOk())
@@ -172,7 +184,7 @@ class JobApplicationControllerTest {
 
 	@Test
 	void getApplication_withUnknownId_returns404() throws Exception {
-		when(service.findById(99L)).thenThrow(new JobApplicationNotFoundException(99L));
+		when(service.findById("alex", 99L)).thenThrow(new JobApplicationNotFoundException(99L));
 
 		mockMvc.perform(get("/api/applications/99"))
 				.andExpect(status().isNotFound())
@@ -183,14 +195,14 @@ class JobApplicationControllerTest {
 	void getApplication_withNonNumericId_returns400() throws Exception {
 		mockMvc.perform(get("/api/applications/abc"))
 				.andExpect(status().isBadRequest());
-		verify(service, never()).findById(any());
+		verify(service, never()).findById(any(), any());
 	}
 
 	@Test
 	void changeStatus_validTransition_returns200() throws Exception {
 		var updated = new JobApplicationResponse(1L, null, "Java Developer", "Deploja AB",
 				null, null, ApplicationStatus.SENT, Instant.parse("2026-11-09T10:00:00Z"), null, null);
-		when(service.changeStatus(eq(1L), any())).thenReturn(updated);
+		when(service.changeStatus(eq("alex"), eq(1L), any())).thenReturn(updated);
 
 		mockMvc.perform(patch("/api/applications/1/status")
 				.contentType(MediaType.APPLICATION_JSON)
@@ -204,7 +216,7 @@ class JobApplicationControllerTest {
 
 	@Test
 	void changeStatus_unknownId_returns404() throws Exception {
-		when(service.changeStatus(eq(99L), any())).thenThrow(new JobApplicationNotFoundException(99L));
+		when(service.changeStatus(eq("alex"), eq(99L), any())).thenThrow(new JobApplicationNotFoundException(99L));
 
 		mockMvc.perform(patch("/api/applications/99/status")
 				.contentType(MediaType.APPLICATION_JSON)
@@ -222,7 +234,7 @@ class JobApplicationControllerTest {
 				.content("{}"))
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.errors.status").exists());
-		verify(service, never()).changeStatus(any(), any());
+		verify(service, never()).changeStatus(any(), any(), any());
 	}
 
 	@Test
@@ -235,12 +247,12 @@ class JobApplicationControllerTest {
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.detail").value(
 						"Invalid value 'FOO' for 'status'. Allowed values: SAVED, SENT, INTERVIEW, REJECTED, OFFER"));
-		verify(service, never()).changeStatus(any(), any());
+		verify(service, never()).changeStatus(any(), any(), any());
 	}
 
 	@Test
 	void changeStatus_invalidTransition_returns409() throws Exception {
-		when(service.changeStatus(eq(1L), any())).thenThrow(
+		when(service.changeStatus(eq("alex"), eq(1L), any())).thenThrow(
 				new InvalidStatusTransitionException(ApplicationStatus.REJECTED, ApplicationStatus.SENT));
 
 		mockMvc.perform(patch("/api/applications/1/status")
@@ -257,7 +269,7 @@ class JobApplicationControllerTest {
 		var updated = new JobApplicationResponse(1L, null, "Java Developer", "Deploja AB",
 				null, null, ApplicationStatus.INTERVIEW, Instant.parse("2026-11-09T10:00:00Z"),
 				"Prepare Spring questions", Instant.parse("2026-11-20T09:00:00Z"));
-		when(service.updateDetails(eq(1L), any())).thenReturn(updated);
+		when(service.updateDetails(eq("alex"), eq(1L), any())).thenReturn(updated);
 
 		mockMvc.perform(put("/api/applications/1/details")
 				.contentType(MediaType.APPLICATION_JSON)
@@ -280,7 +292,7 @@ class JobApplicationControllerTest {
 						"""))
 				.andExpect(status().isOk());
 
-		verify(service).updateDetails(eq(1L), captor.capture());
+		verify(service).updateDetails(eq("alex"), eq(1L), captor.capture());
 		assertThat(captor.getValue().interviewAt()).isEqualTo(Instant.parse("2026-11-20T09:00:00Z"));
 	}
 
@@ -293,7 +305,7 @@ class JobApplicationControllerTest {
 				.content("{}"))
 				.andExpect(status().isOk());
 
-		verify(service).updateDetails(eq(1L), captor.capture());
+		verify(service).updateDetails(eq("alex"), eq(1L), captor.capture());
 		assertThat(captor.getValue().notes()).isNull();
 		assertThat(captor.getValue().interviewAt()).isNull();
 	}
@@ -307,7 +319,7 @@ class JobApplicationControllerTest {
 				.content("{\"notes\": \"" + notes + "\"}"))
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.errors.notes").exists());
-		verify(service, never()).updateDetails(any(), any());
+		verify(service, never()).updateDetails(any(), any(), any());
 	}
 
 	@Test
@@ -319,12 +331,12 @@ class JobApplicationControllerTest {
 						"""))
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.status").value(400));
-		verify(service, never()).updateDetails(any(), any());
+		verify(service, never()).updateDetails(any(), any(), any());
 	}
 
 	@Test
 	void updateDetails_withUnknownId_returns404() throws Exception {
-		when(service.updateDetails(eq(99L), any())).thenThrow(new JobApplicationNotFoundException(99L));
+		when(service.updateDetails(eq("alex"), eq(99L), any())).thenThrow(new JobApplicationNotFoundException(99L));
 
 		mockMvc.perform(put("/api/applications/99/details")
 				.contentType(MediaType.APPLICATION_JSON)
@@ -337,12 +349,12 @@ class JobApplicationControllerTest {
 	void deleteApplication_returns204() throws Exception {
 		mockMvc.perform(delete("/api/applications/1"))
 				.andExpect(status().isNoContent());
-		verify(service).delete(1L);
+		verify(service).delete("alex", 1L);
 	}
 
 	@Test
 	void deleteApplication_withUnknownId_returns404() throws Exception {
-		doThrow(new JobApplicationNotFoundException(99L)).when(service).delete(99L);
+		doThrow(new JobApplicationNotFoundException(99L)).when(service).delete("alex", 99L);
 
 		mockMvc.perform(delete("/api/applications/99"))
 				.andExpect(status().isNotFound())
@@ -353,7 +365,7 @@ class JobApplicationControllerTest {
 	void deleteApplication_withNonNumericId_returns400() throws Exception {
 		mockMvc.perform(delete("/api/applications/abc"))
 				.andExpect(status().isBadRequest());
-		verify(service, never()).delete(any());
+		verify(service, never()).delete(any(), any());
 	}
 
 }

@@ -61,16 +61,18 @@ class SecurityConfigTest {
 				.andExpect(jsonPath("$.status").value(401))
 				.andExpect(jsonPath("$.title").value("Unauthorized"))
 				.andExpect(jsonPath("$.detail").exists());
-		verify(service, never()).findAll(any());
+		verify(service, never()).findAll(any(), any());
 	}
 
 	@Test
 	void protectedEndpoint_withValidToken_returns200() throws Exception {
-		when(service.findAll(any())).thenReturn(List.of());
+		when(service.findAll("alex", null)).thenReturn(List.of());
 		String token = token(jwtEncoder, Instant.now().plusSeconds(600));
 
 		mockMvc.perform(get("/api/applications").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
 				.andExpect(status().isOk());
+		// The subject of the token ("alex") is the username the service receives
+		verify(service).findAll("alex", null);
 	}
 
 	@Test
@@ -107,7 +109,7 @@ class SecurityConfigTest {
 		// With CSRF protection on, this would be a 403. It is off because there are no cookies
 		mockMvc.perform(delete("/api/applications/1"))
 				.andExpect(status().isUnauthorized());
-		verify(service, never()).delete(any());
+		verify(service, never()).delete(any(), any());
 	}
 
 	private static String token(JwtEncoder encoder, Instant expiresAt) {

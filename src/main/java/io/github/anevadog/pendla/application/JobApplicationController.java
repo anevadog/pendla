@@ -3,6 +3,7 @@ package io.github.anevadog.pendla.application;
 import java.util.List;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -25,6 +26,9 @@ import jakarta.validation.Valid;
 
 /**
  * HTTP layer for job applications. No logic and no try/catch: errors go to GlobalExceptionHandler.
+ *
+ * Spring fills the Authentication parameter with the logged-in user: getName() is the username
+ * that came in the token. Each method passes it to the service, which decides what that user can see.
  */
 @RestController
 @RequestMapping("/api/applications")
@@ -38,33 +42,35 @@ public class JobApplicationController {
 	}
 
 	@Operation(summary = "Save a job application",
-			description = "Starts in status SAVED. 400 invalid data · 409 an application for this jobtechId already exists")
+			description = "Starts in status SAVED. 400 invalid data · 409 you already saved an application for this jobtechId")
 	@PostMapping
 	@ResponseStatus(HttpStatus.CREATED)
-	public JobApplicationResponse create(@Valid @RequestBody CreateJobApplicationRequest request) {
-		return service.create(request);
+	public JobApplicationResponse create(Authentication authentication,
+			@Valid @RequestBody CreateJobApplicationRequest request) {
+		return service.create(authentication.getName(), request);
 	}
 
 	@Operation(summary = "List job applications",
-			description = "Newest first. Optional filter by status. 400 invalid status")
+			description = "Only your own, newest first. Optional filter by status. 400 invalid status")
 	@GetMapping
-	public List<JobApplicationResponse> findAll(@RequestParam(required = false) ApplicationStatus status) {
-		return service.findAll(status);
+	public List<JobApplicationResponse> findAll(Authentication authentication,
+			@RequestParam(required = false) ApplicationStatus status) {
+		return service.findAll(authentication.getName(), status);
 	}
 
 	@Operation(summary = "Get one job application", description = "404 not found")
 	@GetMapping("/{id}")
-	public JobApplicationResponse findById(@PathVariable Long id) {
-		return service.findById(id);
+	public JobApplicationResponse findById(Authentication authentication, @PathVariable Long id) {
+		return service.findById(authentication.getName(), id);
 	}
 
 	@Operation(summary = "Change the status of a job application",
 			description = "Allowed: SAVED→SENT, SENT→INTERVIEW|REJECTED, INTERVIEW→OFFER|REJECTED. "
 					+ "400 invalid status · 404 not found · 409 transition not allowed")
 	@PatchMapping("/{id}/status")
-	public JobApplicationResponse changeStatus(@PathVariable Long id,
+	public JobApplicationResponse changeStatus(Authentication authentication, @PathVariable Long id,
 			@Valid @RequestBody UpdateStatusRequest request) {
-		return service.changeStatus(id, request);
+		return service.changeStatus(authentication.getName(), id, request);
 	}
 
 	@Operation(summary = "Replace the notes and interview date of a job application",
@@ -72,16 +78,16 @@ public class JobApplicationController {
 					+ "Notes must not contain third-party contact data. "
 					+ "400 invalid data · 404 not found")
 	@PutMapping("/{id}/details")
-	public JobApplicationResponse updateDetails(@PathVariable Long id,
+	public JobApplicationResponse updateDetails(Authentication authentication, @PathVariable Long id,
 			@Valid @RequestBody UpdateDetailsRequest request) {
-		return service.updateDetails(id, request);
+		return service.updateDetails(authentication.getName(), id, request);
 	}
 
 	@Operation(summary = "Delete a job application", description = "404 not found")
 	@DeleteMapping("/{id}")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
-	public void delete(@PathVariable Long id) {
-		service.delete(id);
+	public void delete(Authentication authentication, @PathVariable Long id) {
+		service.delete(authentication.getName(), id);
 	}
 
 }

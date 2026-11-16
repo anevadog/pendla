@@ -7,13 +7,15 @@ import java.time.Instant;
 
 import org.junit.jupiter.api.Test;
 
+import io.github.anevadog.pendla.user.AppUser;
+
 /**
  * Plain unit tests of the entity's own behaviour: no Spring and no database.
  */
 class JobApplicationTest {
 
 	private JobApplication newApplication() {
-		return new JobApplication(null, "Java Developer", "Deploja AB", null, null);
+		return new JobApplication(new AppUser("alex", "hash"), null, "Java Developer", "Deploja AB", null, null);
 	}
 
 	@Test
