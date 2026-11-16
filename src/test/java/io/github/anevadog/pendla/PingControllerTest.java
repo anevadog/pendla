@@ -7,12 +7,19 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+
+import io.github.anevadog.pendla.common.SecurityConfig;
 
 /**
  * Web layer test: only loads PingController, no database needed.
  */
 @WebMvcTest(PingController.class)
+// Public endpoints: the tests send no token, with the real security rules loaded
+@Import(SecurityConfig.class)
+@TestPropertySource(properties = "jwt.secret=test-secret-with-at-least-32-characters")
 class PingControllerTest {
 
 	@Autowired

@@ -13,6 +13,7 @@ import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
 import org.springframework.validation.method.ParameterValidationResult;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -28,6 +29,7 @@ import io.github.anevadog.pendla.application.JobApplicationNotFoundException;
 import io.github.anevadog.pendla.jobsearch.JobTechTimeoutException;
 import io.github.anevadog.pendla.jobsearch.JobTechUnavailableException;
 import io.github.anevadog.pendla.jobsearch.UnsupportedCityException;
+import io.github.anevadog.pendla.user.InvalidCredentialsException;
 import io.github.anevadog.pendla.user.PasswordTooLongException;
 import io.github.anevadog.pendla.user.UsernameAlreadyExistsException;
 import tools.jackson.databind.exc.InvalidFormatException;
@@ -76,6 +78,27 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 	@ExceptionHandler(UsernameAlreadyExistsException.class)
 	public ProblemDetail handleUsernameAlreadyExists(UsernameAlreadyExistsException ex) {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+	}
+
+	/** Login with an unknown user or a wrong password. */
+	@ExceptionHandler(InvalidCredentialsException.class)
+	public ProblemDetail handleInvalidCredentials(InvalidCredentialsException ex) {
+		return ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, ex.getMessage());
+	}
+
+	/**
+	 * A protected endpoint was called without a token, or with one that is invalid or expired.
+	 * It does not come from a controller: SecurityConfig sends it here from the security filters.
+	 * The detail is fixed on purpose, so the answer does not explain why a token was rejected.
+	 */
+	@ExceptionHandler(AuthenticationException.class)
+	public ResponseEntity<ProblemDetail> handleAuthentication(AuthenticationException ex) {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED,
+				"A valid token is required: log in and send it in the Authorization header");
+		// A 401 must say how to authenticate (RFC 9110)
+		return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+				.header(HttpHeaders.WWW_AUTHENTICATE, "Bearer")
+				.body(problem);
 	}
 
 	@ExceptionHandler(PasswordTooLongException.class)

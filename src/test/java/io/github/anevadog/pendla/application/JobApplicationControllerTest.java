@@ -22,10 +22,14 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import io.github.anevadog.pendla.common.SecurityConfig;
 import io.github.anevadog.pendla.application.dto.JobApplicationResponse;
 import io.github.anevadog.pendla.application.dto.UpdateDetailsRequest;
 
@@ -33,6 +37,10 @@ import io.github.anevadog.pendla.application.dto.UpdateDetailsRequest;
  * Web layer tests: real controller, validation and GlobalExceptionHandler; the service is a mock.
  */
 @WebMvcTest(JobApplicationController.class)
+@Import(SecurityConfig.class)
+@TestPropertySource(properties = "jwt.secret=test-secret-with-at-least-32-characters")
+// Every test here runs as a logged-in user; what happens without a token is in SecurityConfigTest
+@WithMockUser
 class JobApplicationControllerTest {
 
 	@Autowired

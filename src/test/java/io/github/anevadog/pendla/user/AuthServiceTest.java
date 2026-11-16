@@ -8,6 +8,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.Instant;
+import java.util.Optional;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -17,7 +20,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import io.github.anevadog.pendla.user.dto.LoginRequest;
 import io.github.anevadog.pendla.user.dto.RegisterRequest;
+import io.github.anevadog.pendla.user.dto.TokenResponse;
 import io.github.anevadog.pendla.user.dto.UserResponse;
 
 /**
@@ -32,8 +37,43 @@ class AuthServiceTest {
 	@Mock
 	private PasswordEncoder passwordEncoder;
 
+	@Mock
+	private TokenService tokenService;
+
 	@InjectMocks
 	private AuthService service;
+
+	@Test
+	void login_withValidCredentials_returnsTokenForLowercaseUsername() {
+		var token = new TokenResponse("header.payload.signature", Instant.parse("2026-11-16T11:00:00Z"));
+		when(repository.findByUsername("alex")).thenReturn(Optional.of(new AppUser("alex", "hashed-password")));
+		when(passwordEncoder.matches("secret-password", "hashed-password")).thenReturn(true);
+		when(tokenService.createToken("alex")).thenReturn(token);
+
+		TokenResponse response = service.login(new LoginRequest("Alex", "secret-password"));
+
+		assertThat(response).isEqualTo(token);
+	}
+
+	@Test
+	void login_withWrongPassword_throwsInvalidCredentials() {
+		when(repository.findByUsername("alex")).thenReturn(Optional.of(new AppUser("alex", "hashed-password")));
+		when(passwordEncoder.matches("wrong-password", "hashed-password")).thenReturn(false);
+
+		assertThatThrownBy(() -> service.login(new LoginRequest("alex", "wrong-password")))
+				.isInstanceOf(InvalidCredentialsException.class);
+		verify(tokenService, never()).createToken(anyString());
+	}
+
+	@Test
+	void login_withUnknownUsername_throwsSameErrorAsWrongPassword() {
+		when(repository.findByUsername("nobody")).thenReturn(Optional.empty());
+
+		assertThatThrownBy(() -> service.login(new LoginRequest("nobody", "secret-password")))
+				.isInstanceOf(InvalidCredentialsException.class)
+				.hasMessage("Invalid username or password");
+		verify(tokenService, never()).createToken(anyString());
+	}
 
 	@Test
 	void register_withNewUsername_savesLowercaseUsernameAndHashedPassword() {

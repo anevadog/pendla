@@ -8,7 +8,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import io.github.anevadog.pendla.user.dto.LoginRequest;
 import io.github.anevadog.pendla.user.dto.RegisterRequest;
+import io.github.anevadog.pendla.user.dto.TokenResponse;
 import io.github.anevadog.pendla.user.dto.UserResponse;
 
 /**
@@ -22,10 +24,32 @@ public class AuthService {
 
 	private final AppUserRepository repository;
 	private final PasswordEncoder passwordEncoder;
+	private final TokenService tokenService;
 
-	public AuthService(AppUserRepository repository, PasswordEncoder passwordEncoder) {
+	public AuthService(AppUserRepository repository, PasswordEncoder passwordEncoder, TokenService tokenService) {
 		this.repository = repository;
 		this.passwordEncoder = passwordEncoder;
+		this.tokenService = tokenService;
+	}
+
+	/**
+	 * Checks the password and returns a token. An unknown user and a wrong password
+	 * give the same error, so the answer does not reveal which users exist.
+	 */
+	@Transactional(readOnly = true)
+	public TokenResponse login(LoginRequest request) {
+		// Same conversion as in register: usernames are stored in lowercase
+		String username = request.username().toLowerCase(Locale.ROOT);
+
+		AppUser user = repository.findByUsername(username)
+				.orElseThrow(InvalidCredentialsException::new);
+
+		// matches() hashes the password with the salt stored inside the hash and compares the results
+		if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+			throw new InvalidCredentialsException();
+		}
+
+		return tokenService.createToken(user.getUsername());
 	}
 
 	@Transactional
