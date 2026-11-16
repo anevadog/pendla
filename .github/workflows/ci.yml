@@ -23,5 +23,6 @@ jobs:
           java-version: 25
           cache: maven
 
-      # No database needed: the tests mock the repository and the JobTech API
+      # The repository test starts PostgreSQL with Testcontainers (the runner already has Docker).
+      # The other tests mock the repository and the JobTech API
       - run: ./mvnw -B test
