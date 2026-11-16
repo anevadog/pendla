@@ -1,0 +1,22 @@
+# Local PostgreSQL for development. The application itself still runs with ./mvnw spring-boot:run.
+# Docker Compose reads DB_USERNAME and DB_PASSWORD from the same .env file the application uses.
+#
+#   docker compose up -d     start the database in the background
+#   docker compose down      stop it (the data stays in the volume)
+
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: pendla
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      # Host port 5433, so it does not clash with a PostgreSQL installed on the machine (5432).
+      # 127.0.0.1: only this machine can connect, not the rest of the network
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - pendla-data:/var/lib/postgresql
+
+volumes:
+  pendla-data:
